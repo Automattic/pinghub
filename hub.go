@@ -41,11 +41,6 @@ func (h *hub) run() {
 			// Give the connection a reference to its own channel.
 			cmd.conn.control <- h.channels[cmd.path]
 			h.channels[cmd.path].queue <- cmd
-		case UNSUBSCRIBE:
-			fmt.Println("hub unsub")
-			if channel, ok := h.channels[cmd.path]; ok {
-				channel.queue <- cmd
-			}
 		case PUBLISH:
 			fmt.Println("hub pub")
 			if channel, ok := h.channels[cmd.path]; ok {

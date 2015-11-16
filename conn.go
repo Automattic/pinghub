@@ -38,7 +38,7 @@ func (c *connection) reader() {
 		if err != nil {
 			break
 		}
-		c.h.queue <- command{cmd: PUBLISH, path: c.path, text: message}
+		c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
 	}
 	c.ws.Close()
 }
