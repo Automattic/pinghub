@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -32,6 +33,12 @@ func TestApp(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	t.Log("Test: POST /testpath returns 200 OK")
+	resp = post(t, s, "/testpath", "test message")
+	if resp.Status != "200 OK" || string(responseBody(t, resp)) != "OK\n" {
+		t.Errorf("POST response not 200 OK: %v", resp)
+	}
 }
 
 func mockApp() *httptest.Server {
@@ -53,3 +60,12 @@ func responseBody(t *testing.T, r *http.Response) []byte {
 	}
 	return body
 }
+
+func post(t *testing.T, s *httptest.Server, path string, message string) *http.Response {
+	resp, err := http.Post(s.URL + path, "text/plain", strings.NewReader(message))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
