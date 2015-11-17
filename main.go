@@ -11,8 +11,17 @@ var addr = flag.String("addr", ":8081", "http service address")
 
 func main() {
 	flag.Parse()
+
+	// Start the HTTP server
+	http.Handle("/", newHandler())
+	fmt.Printf("ListenAndServe(%v, nil)\n", *addr)
+	http.ListenAndServe(*addr, nil)
+}
+
+func newHandler() http.Handler {
 	h := newHub()
 	go h.run()
+
 	r := mux.NewRouter()
 
 	// Route websocket requests
@@ -23,8 +32,5 @@ func main() {
 	r.Methods("GET").Handler(getHandler{h: h})
 	r.Methods("POST").Handler(postHandler{h: h})
 
-	// Start the HTTP server
-	http.Handle("/", r)
-	fmt.Printf("ListenAndServe(%v, nil)\n", *addr)
-	http.ListenAndServe(*addr, nil)
+	return r
 }
