@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 )
 
 type channel struct {
@@ -19,19 +19,19 @@ func (c *channel) run() {
 	for cmd := range c.queue {
 		switch cmd.cmd {
 		case SUBSCRIBE:
-			fmt.Println("chan sub")
+			log.Println("chan sub")
 			c.subscribe(cmd.conn)
-			fmt.Printf("chan conns: %v\n", c.connections)
+			log.Printf("chan conns: %v\n", c.connections)
 		case UNSUBSCRIBE:
-			fmt.Println("chan unsub")
+			log.Println("chan unsub")
 			c.unsubscribe(cmd.conn)
-			fmt.Printf("chan conns: %v\n", c.connections)
-			fmt.Printf("len: %v\n", len(c.connections))
+			log.Printf("chan conns: %v\n", c.connections)
+			log.Printf("len: %v\n", len(c.connections))
 			if len(c.connections) == 0 {
 				return
 			}
 		case PUBLISH:
-			fmt.Println("chan pub")
+			log.Println("chan pub")
 			c.publish(cmd.text)
 		default:
 			break
@@ -40,7 +40,7 @@ func (c *channel) run() {
 }
 
 func (c *channel) stop() {
-	fmt.Println("chan stop")
+	log.Println("chan stop")
 	close(c.queue)
 	c.h.queue <- command{cmd: REMOVE, path: c.path}
 }
