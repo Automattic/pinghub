@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 )
 
 type hub struct {
@@ -38,24 +37,19 @@ func (h *hub) run() {
 				h.channels[cmd.path] = newChannel(h, cmd.path)
 				go h.channels[cmd.path].run()
 			}
-			log.Printf("hub channels: %v\n", h.channels)
 			// Give the connection a reference to its own channel.
 			cmd.conn.control <- h.channels[cmd.path]
 			h.channels[cmd.path].queue <- cmd
 		case PUBLISH:
-			log.Println("hub pub")
 			if channel, ok := h.channels[cmd.path]; ok {
 				select {
 				case channel.queue <- cmd:
 				default:
-					log.Println("no channel.queue; remove channel")
 					h.remove(cmd.path)
 				}
 			}
 		case REMOVE:
-			log.Println("hub rem")
 			h.remove(cmd.path)
-			log.Printf("hub channels: %v\n", h.channels)
 		default:
 			panic(fmt.Sprintf("unexpected hub cmd: %v\n", cmd))
 		}
