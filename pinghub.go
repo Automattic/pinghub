@@ -31,16 +31,16 @@ const (
 )
 
 const (
-	SUBSCRIBE = 1
+	SUBSCRIBE   = 1
 	UNSUBSCRIBE = 2
-	PUBLISH = 3
-	REMOVE = 4
+	PUBLISH     = 3
+	REMOVE      = 4
 )
 
 type queue chan command
 
 type command struct {
-	cmd int
+	cmd  int
 	conn *connection
 	path string
 	text []byte

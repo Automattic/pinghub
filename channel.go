@@ -1,10 +1,10 @@
 package main
 
 type channel struct {
-	path string
-	queue queue
+	path        string
+	queue       queue
 	connections connections
-	h *hub
+	h           *hub
 }
 
 type connections map[*connection]interface {

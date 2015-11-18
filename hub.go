@@ -5,7 +5,7 @@ import (
 )
 
 type hub struct {
-	queue queue
+	queue    queue
 	channels channels
 }
 
@@ -13,17 +13,17 @@ type channels map[string]*channel
 
 func newHub() *hub {
 	return &hub{
-		queue: make(queue, 16),
+		queue:    make(queue, 16),
 		channels: make(channels),
 	}
 }
 
 func newChannel(h *hub, path string) *channel {
 	return &channel{
-		queue: make(queue, 16),
+		queue:       make(queue, 16),
 		connections: make(connections),
-		h: h,
-		path: path,
+		h:           h,
+		path:        path,
 	}
 }
 

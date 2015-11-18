@@ -16,16 +16,16 @@ type connection struct {
 func newConnection(ws *websocket.Conn, h *hub, path string) *connection {
 	return &connection{
 		control: make(chan *channel, 1),
-		send: make(chan []byte, 256),
-		ws:   ws,
-		h:    h,
-		path: path,
+		send:    make(chan []byte, 256),
+		ws:      ws,
+		h:       h,
+		path:    path,
 	}
 }
 
 func (c *connection) run() {
 	c.h.queue <- command{cmd: SUBSCRIBE, conn: c, path: c.path}
-	c.channel = <- c.control
+	c.channel = <-c.control
 	close(c.control)
 	defer func() { c.channel.queue <- command{cmd: UNSUBSCRIBE, conn: c, path: c.path} }()
 	go c.writer()

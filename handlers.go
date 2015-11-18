@@ -31,7 +31,7 @@ type getHandler struct {
 }
 
 func (gh getHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if ! validateRequest(w, r) {
+	if !validateRequest(w, r) {
 		return
 	}
 	webTemplate.Execute(w, templateArgs{*addr, r.URL.Path})
