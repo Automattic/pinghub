@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"net"
@@ -14,8 +13,10 @@ import (
 	"time"
 )
 
-var _ = fmt.Sprintf
-var _ = os.Exit
+const (
+	WS = 0
+	POST = 1
+)
 
 func TestMain(m *testing.M) {
 	os.Exit(m.Run())
@@ -57,61 +58,102 @@ func TestApp(t *testing.T) {
 	}
 
 	t.Log("Test: clients connect and send messages")
-	var messages = make(map[string][]string)
-	const (
-		WS = 0
-		POST = 1
-	)
+	var hub = mockHub()
 	var clients = map[string][]*client {
-		"/path1": {			
-			{"A", WS, nil, make(chan string, 1), make(chan bool, 1), make(chan string, 1)},
-//			{"B", WS, nil, make(chan string, 1), make(chan bool, 1), make(chan string, 1)},
-			{"C", POST, nil, nil, nil, nil}},
-		"/path2": {			
-			{"D", WS, nil, make(chan string, 1), make(chan bool, 1), make(chan string, 1)},
-//			{"E", WS, nil, make(chan string, 1), make(chan bool, 1), make(chan string, 1)},
-			{"F", POST, nil, nil, nil, nil}},
+		"/path1": {
+			mockClient("A", WS),
+			mockClient("B", WS),
+			mockClient("C", POST),
+		},
+		"/path2": {
+			mockClient("D", POST),
+			mockClient("E", WS),
+			mockClient("F", WS),
+		},
+		"/path3": {
+			mockClient("G", WS),
+			mockClient("H", POST),
+			mockClient("I", POST),
+			mockClient("J", WS),
+		},
 	}
 
-	for path, cs := range clients {
-		messages[path] = []string{}
-		for i, c := range cs {
-			messages[path] = append(messages[path], c.message)
+	for path := range clients {
+		for i := range clients[path] {
+			c := clients[path][i]
 			url, _ = url.Parse(server.URL)
 			url.Path = path
 			switch c.method {
 
 			case WS:
 				url.Scheme = "ws"
-				c.ws = mockWsClient(t, url, c)
+				c.ws = mockWs(t, url, c)
+				hub.subscribe(path, c)
 				defer c.ws.Close()
 				go c.run(t)
-				c.send(c.message)
-				clients[path][i] = c
+				c.sendSync(c.message)
+				hub.send(path, c.message)
 
 			case POST:
 				resp := post(t, url, c.message)
 				if resp.Status != "200 OK" || string(responseBody(t, resp)) != "OK\n" {
 					t.Fatal("POST response not 200 OK:", resp)
 				}
-				fmt.Println("POST", c.message)
+				hub.send(path, c.message)
 			}
 		}
 	}
 
 	t.Log("Test: websocket clients receive messages in order")
-	for path, cs := range clients {
-		for _, c := range cs {
+	for path := range clients {
+		for i := range clients[path] {
+			c := clients[path][i]
 			if c.method == WS {
-				for _, expected := range messages[path] {
-					message := c.receive()
+				for _, expected := range hub.receiveAll(path, c) {
+					message := c.receiveSync()
 					if message != expected {
-						t.Error("expected", expected, "got", message)
+						t.Fatal("expected", expected, "got", message)
 					}
 				}
+				c.stop()
 			}
 		}
 	}
+}
+
+type fakeHub struct {
+	m map[string]map[*client]chan string
+}
+
+func mockHub() *fakeHub {
+	return &fakeHub{
+		m: make(map[string]map[*client]chan string),
+	}
+}
+
+func (h *fakeHub) subscribe(path string, c *client) {
+	if _, ok := h.m[path]; !ok {
+		h.m[path] = make(map[*client]chan string)
+	}
+	h.m[path][c] = make(chan string, 1000)
+}
+
+func (h *fakeHub) send(path string, message string) {
+	if _, ok := h.m[path]; !ok {
+		return
+	}
+	for c := range h.m[path] {
+		h.m[path][c]<- message
+	}
+}
+
+func (h *fakeHub) receiveAll(path string, client *client) (messages []string) {
+	for { select {
+	case m := <-h.m[path][client]:
+		messages = append(messages, m)
+	default:
+		return
+	}}
 }
 
 func mockApp() *httptest.Server {
@@ -142,59 +184,80 @@ func post(t *testing.T, url *url.URL, message string) *http.Response {
 	return resp
 }
 
-func mockWsClient(t *testing.T, url *url.URL, c *client) *websocket.Conn {
-	dialer := &websocket.Dialer{
-		NetDial: func(network, addr string) (net.Conn, error) { return net.Dial(network, url.Host) },
-		Proxy: http.ProxyFromEnvironment,
-		HandshakeTimeout: 2 * time.Second,
-		Subprotocols: []string{"p1", c.message},
-	}
-	t.Log("dialer:", dialer)
-	ws, resp, err := dialer.Dial(url.String(), nil)
-	if err != nil {
-		t.Fatal("dial error:", err, "resp:", resp)
-	}
-	return ws
-}
-
-type client struct{
+type client struct {
 	message string
 	method int
 	ws *websocket.Conn
 	tx chan string
 	rx chan bool
 	res chan string
+	end chan bool
+}
+
+func mockClient(message string, method int) *client {
+	if method == POST {
+		return &client{message, method, nil, nil, nil, nil, nil}
+	}
+	return &client{
+		message,
+		method,
+		nil,
+		make(chan string, 1),
+		make(chan bool, 1),
+		make(chan string, 1),
+		make(chan bool, 1),
+	}
 }
 
 func (c *client) run(t *testing.T) {
-	defer close(c.tx)
-	defer close(c.rx)
-	var message string
 	for { select {
-	case message = <- c.tx :
+	case message := <-c.tx :
 		err := c.ws.WriteMessage(
 			websocket.TextMessage, []byte(message))
 		if err != nil {
 			t.Fatal("WriteMessage:", err)
 		}
-		fmt.Println("WS", message)
-		c.res <- "OK"
+		c.res<- "OK"
 	case <-c.rx :
 		_, message, err := c.ws.ReadMessage()
 		if err != nil {
 			t.Fatal("ReadMessage:", err)
 		}
-		c.res <- string(message)
+		c.res<- string(message)
+	case <-c.end:
+		break
 	}}
 }
 
-func (c *client) send(message string) {
+func (c *client) sendSync(message string) {
 	c.tx<- message
 	<-c.res
 }
 
-func (c *client) receive() string {
-	c.rx <- true
+func (c *client) receiveSync() string {
+	c.rx<- true
 	message := <-c.res
 	return string(message)
+}
+
+func (c *client) stop() {
+	c.end<- true
+}
+
+func mockWs(t *testing.T, url *url.URL, c *client) *websocket.Conn {
+	dialer := &websocket.Dialer{
+		NetDial: func(network, addr string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: 3 * time.Second,
+			}
+			return d.Dial(network, url.Host) },
+		Proxy: http.ProxyFromEnvironment,
+		HandshakeTimeout: 3 * time.Second,
+		Subprotocols: []string{"p1", c.message},
+	}
+	ws, resp, err := dialer.Dial(url.String(), nil)
+	if err != nil {
+		t.Fatal("dial error:", err, "resp:", resp)
+	}
+	return ws
 }
