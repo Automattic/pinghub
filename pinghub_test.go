@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"log"
@@ -9,19 +10,26 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
+	"testing/quick"
 	"time"
 )
 
 const (
-	WS   = 0
-	POST = 1
+	WS   = true
+	POST = false
 )
 
-var server *httptest.Server
+var (
+	server *httptest.Server
+	seed *int64
+)
 
 func TestMain(m *testing.M) {
+	seed = flag.Int64("seed", time.Now().UnixNano(), "Seed for RNG used by fuzzer (default: time in nanoseconds)")
 	os.Exit(runServer(m))
 }
 
@@ -62,33 +70,21 @@ func TestXSS(t *testing.T) {
 
 func TestClients(t *testing.T) {
 	t.Log("TestClients: clients connect and publish messages")
+	t.Log("TestClients: RNG seed:", *seed, "(command line flag '-seed N')")
+	rnd := rand.New(rand.NewSource(*seed))
 	hub := mockHub()
-	clients := map[string][]*client{
-		"/path1": {
-			mockClient("A", WS),
-			mockClient("B", WS),
-			mockClient("C", POST),
-		},
-		"/path2": {
-			mockClient("D", POST),
-			mockClient("E", WS),
-			mockClient("F", WS),
-		},
-		"/path3": {
-			mockClient("G", WS),
-			mockClient("H", POST),
-			mockClient("I", POST),
-			mockClient("J", WS),
-			mockClient("K", WS),
-			mockClient("L", POST),
-			mockClient("M", POST),
-			mockClient("N", WS),
-		},
-	}
-
-	for path := range clients {
-		for i := range clients[path] {
-			c := clients[path][i]
+	clients := make(map[string][]*client)
+	pathClients := []int{3, 10, 50, 200}
+	for _, numClients := range pathClients {
+		path := "/" + quickValue("", rnd).(string)
+		t.Log("Testing", numClients, "clients on path", path)
+		clients[path] = []*client{}
+		for clientNum := 0; clientNum < numClients; clientNum++ {
+			method := quickValue(true, rnd).(bool)
+			message := quickValue("", rnd).(string)
+			newClient := mockClient(method)
+			clients[path] = append(clients[path], newClient)
+			c := clients[path][clientNum]
 			u, _ := url.Parse(server.URL)
 			u.Path = path
 			switch c.method {
@@ -99,15 +95,15 @@ func TestClients(t *testing.T) {
 				defer c.ws.Close()
 				hub.subscribe(path, c)
 				go c.reader()
-				c.sendSync(t, c.message)
-				hub.send(path, c.message)
+				c.sendSync(t, message)
+				hub.send(path, message)
 
 			case POST:
-				resp := post(t, u, c.message)
+				resp := post(t, u, message)
 				if resp.Status != "200 OK" || string(responseBody(t, resp)) != "OK\n" {
 					t.Fatal("POST response not 200 OK:", resp)
 				}
-				hub.send(path, c.message)
+				hub.send(path, message)
 			}
 		}
 	}
@@ -127,6 +123,15 @@ func TestClients(t *testing.T) {
 			}
 		}
 	}
+}
+
+func quickValue(x interface{}, r *rand.Rand) interface{} {
+	t := reflect.TypeOf(x)
+	value, ok := quick.Value(t, r)
+	if ! ok {
+		panic("Failed to create a quick value: " + t.Name())
+	}
+	return value.Interface()
 }
 
 type fakeHub struct {
@@ -191,20 +196,18 @@ func post(t *testing.T, u *url.URL, message string) *http.Response {
 }
 
 type client struct {
-	message string
-	method  int
+	method  bool
 	waiting bool
 	ws      *websocket.Conn
 	res     chan struct{}
 	rec     []string
 }
 
-func mockClient(message string, method int) *client {
+func mockClient(method bool) *client {
 	if method == POST {
-		return &client{message, method, false, nil, nil, nil}
+		return &client{method, false, nil, nil, nil}
 	}
 	return &client{
-		message,
 		method,
 		false,
 		nil,
@@ -255,7 +258,6 @@ func mockWs(t *testing.T, u *url.URL, c *client) *websocket.Conn {
 		},
 		Proxy:            http.ProxyFromEnvironment,
 		HandshakeTimeout: 3 * time.Second,
-		Subprotocols:     []string{"p1", c.message},
 	}
 	ws, resp, err := dialer.Dial(u.String(), nil)
 	if err != nil {
