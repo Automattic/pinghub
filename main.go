@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/gorilla/mux"
+	"log"
 	"net/http"
 )
 
@@ -13,7 +14,7 @@ func main() {
 
 	// Start the HTTP server
 	http.Handle("/", newHandler())
-	http.ListenAndServe(*addr, nil)
+	log.Fatal(http.ListenAndServe(*addr, nil))
 }
 
 func newHandler() http.Handler {
