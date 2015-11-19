@@ -234,7 +234,7 @@ func (c *client) sendSync(t *testing.T, message string) {
 	if err != nil {
 		t.Fatal("WriteMessage:", err)
 	}
-	_, ok := <- c.res
+	_, ok := <-c.res
 	if !ok {
 		t.Fatal("Failed waiting for echo.")
 	}
