@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gorilla/websocket"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -18,48 +19,51 @@ const (
 	POST = 1
 )
 
+var server *httptest.Server
+
 func TestMain(m *testing.M) {
-	os.Exit(m.Run())
+	os.Exit(runServer(m))
 }
 
-func TestApp(t *testing.T) {
-	var url *url.URL
-	var resp *http.Response
-	var body string
-	var err error
-
-	t.Log("Test: start server")
-	var server *httptest.Server = mockApp()
+func runServer(m *testing.M) int {
+	server = httptest.NewServer(newHandler())
 	defer server.Close()
-	_, err = url.Parse(server.URL)
+	_, err := url.Parse(server.URL)
 	if err != nil {
-		t.Fatal("Server URL parse error:", err)
+		log.Fatal("Server URL parse error:", err)
 	}
+	return m.Run()
+}
 
-	t.Log("Test: GET /somestring serves HTML containing /somestring")
-	url, _ = url.Parse(server.URL)
-	url.Path = "/somestring"
-	resp = get(t, url)
-	body = string(responseBody(t, resp))
+func TestHTML(t *testing.T) {
+	t.Log("TestHTML: GET /somestring serves HTML containing /somestring")
+	u, _ := url.Parse(server.URL)
+	u.Path = "/somestring"
+	resp := get(t, u)
+	body := string(responseBody(t, resp))
 	if !strings.Contains(body, "<html>") {
 		t.Fatal("No HTML from server:", resp)
 	}
 	if !strings.Contains(body, "/somestring") {
 		t.Fatal("Path not found in HTML:", resp)
 	}
+}
 
-	t.Log("Test: GET /<xss> does not return <xss>")
-	url, _ = url.Parse(server.URL)
-	url.Path = "/<xss>"
-	resp = get(t, url)
-	body = string(responseBody(t, resp))
+func TestXSS(t *testing.T) {
+	t.Log("TestXSS: GET /<xss> does not return <xss>")
+	u, _ := url.Parse(server.URL)
+	u.RawPath = "/<xss>"
+	resp := get(t, u)
+	body := string(responseBody(t, resp))
 	if strings.Contains(body, "<xss>") {
 		t.Fatal("HTML contains <xss>")
 	}
+}
 
-	t.Log("Test: clients connect and send messages")
-	var hub = mockHub()
-	var clients = map[string][]*client{
+func TestClients(t *testing.T) {
+	t.Log("TestClients: clients connect and publish messages")
+	hub := mockHub()
+	clients := map[string][]*client{
 		"/path1": {
 			mockClient("A", WS),
 			mockClient("B", WS),
@@ -75,27 +79,31 @@ func TestApp(t *testing.T) {
 			mockClient("H", POST),
 			mockClient("I", POST),
 			mockClient("J", WS),
+			mockClient("K", WS),
+			mockClient("L", POST),
+			mockClient("M", POST),
+			mockClient("N", WS),
 		},
 	}
 
 	for path := range clients {
 		for i := range clients[path] {
 			c := clients[path][i]
-			url, _ = url.Parse(server.URL)
-			url.Path = path
+			u, _ := url.Parse(server.URL)
+			u.Path = path
 			switch c.method {
 
 			case WS:
-				url.Scheme = "ws"
-				c.ws = mockWs(t, url, c)
-				hub.subscribe(path, c)
+				u.Scheme = "ws"
+				c.ws = mockWs(t, u, c)
 				defer c.ws.Close()
-				go c.run(t)
-				c.sendSync(c.message)
+				hub.subscribe(path, c)
+				go c.reader()
+				c.sendSync(t, c.message)
 				hub.send(path, c.message)
 
 			case POST:
-				resp := post(t, url, c.message)
+				resp := post(t, u, c.message)
 				if resp.Status != "200 OK" || string(responseBody(t, resp)) != "OK\n" {
 					t.Fatal("POST response not 200 OK:", resp)
 				}
@@ -104,18 +112,18 @@ func TestApp(t *testing.T) {
 		}
 	}
 
-	t.Log("Test: websocket clients receive messages in order")
+	t.Log("TestClients: clients receive messages in order")
+	// Give the server some time to transact with all clients.
+	time.Sleep(50 * time.Millisecond)
 	for path := range clients {
 		for i := range clients[path] {
 			c := clients[path][i]
 			if c.method == WS {
-				for _, expected := range hub.receiveAll(path, c) {
-					message := c.receiveSync()
-					if message != expected {
-						t.Fatal("expected", expected, "got", message)
-					}
+				expected := strings.Join(hub.receiveAll(path, c), "")
+				got := c.readAll()
+				if expected != got {
+					t.Fatal("expected", expected, "got", got)
 				}
-				c.stop()
 			}
 		}
 	}
@@ -158,12 +166,8 @@ func (h *fakeHub) receiveAll(path string, client *client) (messages []string) {
 	}
 }
 
-func mockApp() *httptest.Server {
-	return httptest.NewServer(newHandler())
-}
-
-func get(t *testing.T, url *url.URL) *http.Response {
-	resp, err := http.Get(url.String())
+func get(t *testing.T, u *url.URL) *http.Response {
+	resp, err := http.Get(u.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,8 +182,8 @@ func responseBody(t *testing.T, r *http.Response) []byte {
 	return body
 }
 
-func post(t *testing.T, url *url.URL, message string) *http.Response {
-	resp, err := http.Post(url.String(), "text/plain", strings.NewReader(message))
+func post(t *testing.T, u *url.URL, message string) *http.Response {
+	resp, err := http.Post(u.String(), "text/plain", strings.NewReader(message))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,78 +193,71 @@ func post(t *testing.T, url *url.URL, message string) *http.Response {
 type client struct {
 	message string
 	method  int
+	waiting bool
 	ws      *websocket.Conn
-	tx      chan string
-	rx      chan bool
-	res     chan string
-	end     chan bool
+	res     chan struct{}
+	rec     []string
 }
 
 func mockClient(message string, method int) *client {
 	if method == POST {
-		return &client{message, method, nil, nil, nil, nil, nil}
+		return &client{message, method, false, nil, nil, nil}
 	}
 	return &client{
 		message,
 		method,
+		false,
 		nil,
-		make(chan string, 1),
-		make(chan bool, 1),
-		make(chan string, 1),
-		make(chan bool, 1),
+		make(chan struct{}),
+		[]string{},
 	}
 }
 
-func (c *client) run(t *testing.T) {
+func (c *client) reader() {
 	for {
-		select {
-		case message := <-c.tx:
-			err := c.ws.WriteMessage(
-				websocket.TextMessage, []byte(message))
-			if err != nil {
-				t.Fatal("WriteMessage:", err)
-			}
-			c.res <- "OK"
-		case <-c.rx:
-			_, message, err := c.ws.ReadMessage()
-			if err != nil {
-				t.Fatal("ReadMessage:", err)
-			}
-			c.res <- string(message)
-		case <-c.end:
-			break
+		_, message, err := c.ws.ReadMessage()
+		if err != nil {
+			return
+		}
+		c.rec = append(c.rec, string(message))
+		if c.waiting {
+			c.res <- struct{}{}
 		}
 	}
 }
 
-func (c *client) sendSync(message string) {
-	c.tx <- message
-	<-c.res
+// Send a message and block until echo is received
+func (c *client) sendSync(t *testing.T, message string) {
+	c.waiting = true
+	err := c.ws.WriteMessage(
+		websocket.TextMessage, []byte(message))
+	if err != nil {
+		t.Fatal("WriteMessage:", err)
+	}
+	_, ok := <- c.res
+	if !ok {
+		t.Fatal("Failed waiting for echo.")
+	}
+	c.waiting = false
 }
 
-func (c *client) receiveSync() string {
-	c.rx <- true
-	message := <-c.res
-	return string(message)
+func (c *client) readAll() string {
+	return strings.Join(c.rec, "")
 }
 
-func (c *client) stop() {
-	c.end <- true
-}
-
-func mockWs(t *testing.T, url *url.URL, c *client) *websocket.Conn {
+func mockWs(t *testing.T, u *url.URL, c *client) *websocket.Conn {
 	dialer := &websocket.Dialer{
 		NetDial: func(network, addr string) (net.Conn, error) {
 			d := net.Dialer{
 				Timeout: 3 * time.Second,
 			}
-			return d.Dial(network, url.Host)
+			return d.Dial(network, u.Host)
 		},
 		Proxy:            http.ProxyFromEnvironment,
 		HandshakeTimeout: 3 * time.Second,
 		Subprotocols:     []string{"p1", c.message},
 	}
-	ws, resp, err := dialer.Dial(url.String(), nil)
+	ws, resp, err := dialer.Dial(u.String(), nil)
 	if err != nil {
 		t.Fatal("dial error:", err, "resp:", resp)
 	}
