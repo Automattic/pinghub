@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"flag"
 	"github.com/gorilla/websocket"
 	"io/ioutil"
@@ -24,23 +25,28 @@ const (
 )
 
 var (
+	rnd *rand.Rand
+	seed *int64 = flag.Int64("seed", time.Now().UnixNano(), "Seed for RNG used by fuzzer (default: time in nanoseconds)")
 	server *httptest.Server
-	seed *int64
 )
 
 func TestMain(m *testing.M) {
-	seed = flag.Int64("seed", time.Now().UnixNano(), "Seed for RNG used by fuzzer (default: time in nanoseconds)")
-	os.Exit(runServer(m))
-}
+	flag.Parse()
+	rnd = rand.New(rand.NewSource(*seed))
+	fmt.Println("TestMain: rand seed:", *seed, "(command line flag '-seed=N')")
 
-func runServer(m *testing.M) int {
 	server = httptest.NewServer(newHandler())
 	defer server.Close()
-	_, err := url.Parse(server.URL)
+	u, err := url.Parse(server.URL)
 	if err != nil {
 		log.Fatal("Server URL parse error:", err)
 	}
-	return m.Run()
+	fmt.Println("TestMain: server addr:", u)
+
+	os.Exit(m.Run())
+}
+
+func runServer() {
 }
 
 func TestHTML(t *testing.T) {
@@ -68,58 +74,74 @@ func TestXSS(t *testing.T) {
 	}
 }
 
-func TestClients(t *testing.T) {
-	t.Log("TestClients: clients connect and publish messages")
-	t.Log("TestClients: RNG seed:", *seed, "(command line flag '-seed N')")
-	rnd := rand.New(rand.NewSource(*seed))
+func TestClients1(t *testing.T) {
+	testClientsN(t, 1, "/testpath1")
+	testClientsN(t, 1, randomPath())
+}
+
+func TestClients10(t *testing.T) {
+	testClientsN(t, 10, "/testpath1")
+	testClientsN(t, 10, randomPath())
+}
+
+func TestClients100(t *testing.T) {
+	testClientsN(t, 100, "/testpath1")
+	testClientsN(t, 100, randomPath())
+}
+
+/*
+func TestClients1000(t *testing.T) {
+	testClientsN(t, 1000, "/testpath1")
+	testClientsN(t, 1000, randomPath())
+}
+*/
+
+func randomPath() string {
+	return "/" + quickValue("", rnd).(string)
+}
+
+func testClientsN(t *testing.T, numClients int, path string) {
+	t.Log("Testing", numClients, "clients on path", path)
 	hub := mockHub()
-	clients := make(map[string][]*client)
-	pathClients := []int{3, 10, 50, 200}
-	for _, numClients := range pathClients {
-		path := "/" + quickValue("", rnd).(string)
-		t.Log("Testing", numClients, "clients on path", path)
-		clients[path] = []*client{}
-		for clientNum := 0; clientNum < numClients; clientNum++ {
-			method := quickValue(true, rnd).(bool)
-			message := quickValue("", rnd).(string)
-			newClient := mockClient(method)
-			clients[path] = append(clients[path], newClient)
-			c := clients[path][clientNum]
-			u, _ := url.Parse(server.URL)
-			u.Path = path
-			switch c.method {
+	clients := []*client{}
+	for i := 0; i < numClients; i++ {
+		method := quickValue(true, rnd).(bool)
+		message := quickValue("", rnd).(string)
+		newClient := mockClient(method)
+		clients = append(clients, newClient)
+		c := clients[i]
+		u, _ := url.Parse(server.URL)
+		u.Path = path
+		switch c.method {
 
-			case WS:
-				u.Scheme = "ws"
-				c.ws = mockWs(t, u, c)
-				defer c.ws.Close()
-				hub.subscribe(path, c)
-				go c.reader()
-				c.sendSync(t, message)
-				hub.send(path, message)
+		case WS:
+			u.Scheme = "ws"
+			c.ws = mockWs(t, u, c)
+			defer c.ws.Close()
+			hub.subscribe(path, c)
+			go c.reader()
+			c.sendSync(t, message)
+			hub.send(path, message)
 
-			case POST:
-				resp := post(t, u, message)
-				if resp.Status != "200 OK" || string(responseBody(t, resp)) != "OK\n" {
-					t.Fatal("POST response not 200 OK:", resp)
-				}
-				hub.send(path, message)
+		case POST:
+			resp := post(t, u, message)
+			if resp.Status != "200 OK" || string(responseBody(t, resp)) != "OK\n" {
+				t.Fatal("POST response not 200 OK:", resp)
 			}
+			hub.send(path, message)
 		}
 	}
 
 	t.Log("TestClients: clients receive messages in order")
 	// Give the server some time to transact with all clients.
 	time.Sleep(50 * time.Millisecond)
-	for path := range clients {
-		for i := range clients[path] {
-			c := clients[path][i]
-			if c.method == WS {
-				expected := strings.Join(hub.receiveAll(path, c), "")
-				got := c.readAll()
-				if expected != got {
-					t.Fatal("expected", expected, "got", got)
-				}
+	for i := range clients {
+		c := clients[i]
+		if c.method == WS {
+			expected := strings.Join(hub.receiveAll(path, c), "")
+			got := c.readAll()
+			if expected != got {
+				t.Fatal("expected", expected, "got", got)
 			}
 		}
 	}
