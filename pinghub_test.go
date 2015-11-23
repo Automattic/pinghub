@@ -20,8 +20,11 @@ import (
 )
 
 const (
-	WS   = true
-	POST = false
+	WS         = true
+	POST       = false
+	TESTORIGIN = "https://example.com"
+	BADORIGIN1 = "https://example.net"
+	BADORIGIN2 = "http://example.com"
 )
 
 var (
@@ -35,7 +38,7 @@ func TestMain(m *testing.M) {
 	rnd = rand.New(rand.NewSource(*seed))
 	fmt.Println("TestMain: rand seed:", *seed, "(command line flag '-seed=N')")
 
-	server = httptest.NewServer(newHandler())
+	server = httptest.NewServer(newHandler(TESTORIGIN))
 	defer server.Close()
 	u, err := url.Parse(server.URL)
 	if err != nil {
@@ -44,9 +47,6 @@ func TestMain(m *testing.M) {
 	fmt.Println("TestMain: server addr:", u)
 
 	os.Exit(m.Run())
-}
-
-func runServer() {
 }
 
 func TestHTML(t *testing.T) {
@@ -74,24 +74,48 @@ func TestXSS(t *testing.T) {
 	}
 }
 
+func TestBadOrigin1(t *testing.T) {
+	t.Log("TestOrigin: Origin host mismatch returns 403.")
+	client := mockClient(WS, BADORIGIN1)
+	u, _ := url.Parse(server.URL)
+	u.Path = "/testpath"
+	u.Scheme = "ws"
+	_, err := mockWs(t, u, client)
+	if err == nil {
+		t.Fatal("TestOrigin: server failed to return 403 for a bad origin.")
+	}
+}
+
+func TestBadOrigin2(t *testing.T) {
+	t.Log("TestOrigin: Origin scheme mismatch returns 403.")
+	client := mockClient(WS, BADORIGIN2)
+	u, _ := url.Parse(server.URL)
+	u.Path = "/testpath"
+	u.Scheme = "ws"
+	_, err := mockWs(t, u, client)
+	if err == nil {
+		t.Fatal("TestOrigin: server failed to return 403 for a bad origin.")
+	}
+}
+
 func TestClients1(t *testing.T) {
 	testClientsN(t, 1, "/testpath1")
 	testClientsN(t, 1, randomPath())
 }
 
 func TestClients10(t *testing.T) {
-	testClientsN(t, 10, "/testpath1")
+	testClientsN(t, 10, "/testpath10")
 	testClientsN(t, 10, randomPath())
 }
 
 func TestClients100(t *testing.T) {
-	testClientsN(t, 100, "/testpath1")
+	testClientsN(t, 100, "/testpath100")
 	testClientsN(t, 100, randomPath())
 }
 
 /*
 func TestClients1000(t *testing.T) {
-	testClientsN(t, 1000, "/testpath1")
+	testClientsN(t, 1000, "/testpath1000")
 	testClientsN(t, 1000, randomPath())
 }
 */
@@ -107,7 +131,7 @@ func testClientsN(t *testing.T, numClients int, path string) {
 	for i := 0; i < numClients; i++ {
 		method := quickValue(true, rnd).(bool)
 		message := quickValue("", rnd).(string)
-		newClient := mockClient(method)
+		newClient := mockClient(method, TESTORIGIN)
 		clients = append(clients, newClient)
 		c := clients[i]
 		u, _ := url.Parse(server.URL)
@@ -116,7 +140,11 @@ func testClientsN(t *testing.T, numClients int, path string) {
 
 		case WS:
 			u.Scheme = "ws"
-			c.ws = mockWs(t, u, c)
+			ws, err := mockWs(t, u, c)
+			if err != nil {
+				t.Fatal("dial error:", err)
+			}
+			c.ws = ws
 			defer c.ws.Close()
 			hub.subscribe(path, c)
 			go c.reader()
@@ -223,11 +251,12 @@ type client struct {
 	ws      *websocket.Conn
 	res     chan struct{}
 	rec     []string
+	origin  string
 }
 
-func mockClient(method bool) *client {
+func mockClient(method bool, origin string) *client {
 	if method == POST {
-		return &client{method, false, nil, nil, nil}
+		return &client{method, false, nil, nil, nil, origin}
 	}
 	return &client{
 		method,
@@ -235,6 +264,7 @@ func mockClient(method bool) *client {
 		nil,
 		make(chan struct{}),
 		[]string{},
+		origin,
 	}
 }
 
@@ -270,7 +300,7 @@ func (c *client) readAll() string {
 	return strings.Join(c.rec, "")
 }
 
-func mockWs(t *testing.T, u *url.URL, c *client) *websocket.Conn {
+func mockWs(t *testing.T, u *url.URL, c *client) (*websocket.Conn, error) {
 	dialer := &websocket.Dialer{
 		NetDial: func(network, addr string) (net.Conn, error) {
 			d := net.Dialer{
@@ -281,9 +311,10 @@ func mockWs(t *testing.T, u *url.URL, c *client) *websocket.Conn {
 		Proxy:            http.ProxyFromEnvironment,
 		HandshakeTimeout: 3 * time.Second,
 	}
-	ws, resp, err := dialer.Dial(u.String(), nil)
-	if err != nil {
-		t.Fatal("dial error:", err, "resp:", resp)
+	requestHeader := http.Header{}
+	if c.origin != "" {
+		requestHeader.Set("Origin", c.origin)
 	}
-	return ws
+	ws, _, err := dialer.Dial(u.String(), requestHeader)
+	return ws, err
 }

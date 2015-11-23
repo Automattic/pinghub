@@ -4,30 +4,77 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"net/url"
 	"unicode/utf8"
 )
 
 type wsHandler struct {
-	h *hub
+	hub *hub
+	upgrader *websocket.Upgrader
 }
 
-var upgrader = &websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
+func newWsHandler(hub *hub, origin string) wsHandler {
+	return wsHandler{
+		hub: hub,
+		upgrader: &websocket.Upgrader{
+			ReadBufferSize: 1024,
+			WriteBufferSize: 1024,
+			CheckOrigin: wsOriginChecker(origin),
+		},
+	}
+}
+
+func wsOriginChecker(origin string) func (r *http.Request) bool {
+	if origin == "" {
+		return func (r *http.Request) bool {
+			fmt.Println("wsOriginChecker true")
+			return true
+		}
+	}
+
+	serverOriginURL, err := url.Parse(origin)
+	if err != nil {
+		log.Fatal("Failed to parse origin", origin, err)
+	}
+	return func (r *http.Request) bool {
+		o := r.Header["Origin"]
+		if len(o) == 0 {
+			return true
+		}
+		clientOrigin := o[0]
+		if clientOrigin == origin {
+			return true
+		}
+		clientOriginURL, err := url.Parse(clientOrigin)
+		if err != nil {
+			return false
+		}
+		if clientOriginURL.Scheme != serverOriginURL.Scheme {
+			return false
+		}
+		if clientOriginURL.Host != serverOriginURL.Host {
+			return false
+		}
+		return true
+	}
+}
 
 func (wsh wsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !validateRequest(w, r) {
 		return
 	}
-	ws, err := upgrader.Upgrade(w, r, nil)
+	ws, err := wsh.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
-	c := newConnection(ws, wsh.h, r.URL.Path)
+	c := newConnection(ws, wsh.hub, r.URL.Path)
 	c.run()
 }
 
 type getHandler struct {
-	h *hub
+	hub *hub
 }
 
 func (gh getHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +85,7 @@ func (gh getHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type postHandler struct {
-	h *hub
+	hub *hub
 }
 
 func (ph postHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +97,7 @@ func (ph postHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sendBadRequestError(w, "Unable to read POST body.")
 		return
 	}
-	ph.h.queue <- command{cmd: PUBLISH, path: r.URL.Path, text: body}
+	ph.hub.queue <- command{cmd: PUBLISH, path: r.URL.Path, text: body}
 	w.Write([]byte("OK\n"))
 }
 
