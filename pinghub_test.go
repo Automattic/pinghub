@@ -1,17 +1,17 @@
 package main
 
 import (
-	"fmt"
 	"flag"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
@@ -28,8 +28,8 @@ const (
 )
 
 var (
-	rnd *rand.Rand
-	seed *int64 = flag.Int64("seed", time.Now().UnixNano(), "Seed for RNG used by fuzzer (default: time in nanoseconds)")
+	rnd    *rand.Rand
+	seed   *int64 = flag.Int64("seed", time.Now().UnixNano(), "Seed for RNG used by fuzzer (default: time in nanoseconds)")
 	server *httptest.Server
 )
 
@@ -178,7 +178,7 @@ func testClientsN(t *testing.T, numClients int, path string) {
 func quickValue(x interface{}, r *rand.Rand) interface{} {
 	t := reflect.TypeOf(x)
 	value, ok := quick.Value(t, r)
-	if ! ok {
+	if !ok {
 		panic("Failed to create a quick value: " + t.Name())
 	}
 	return value.Interface()

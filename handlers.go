@@ -11,7 +11,7 @@ import (
 )
 
 type wsHandler struct {
-	hub *hub
+	hub      *hub
 	upgrader *websocket.Upgrader
 }
 
@@ -19,16 +19,16 @@ func newWsHandler(hub *hub, origin string) wsHandler {
 	return wsHandler{
 		hub: hub,
 		upgrader: &websocket.Upgrader{
-			ReadBufferSize: 1024,
+			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
-			CheckOrigin: wsOriginChecker(origin),
+			CheckOrigin:     wsOriginChecker(origin),
 		},
 	}
 }
 
-func wsOriginChecker(origin string) func (r *http.Request) bool {
+func wsOriginChecker(origin string) func(r *http.Request) bool {
 	if origin == "" {
-		return func (r *http.Request) bool {
+		return func(r *http.Request) bool {
 			fmt.Println("wsOriginChecker true")
 			return true
 		}
@@ -38,7 +38,7 @@ func wsOriginChecker(origin string) func (r *http.Request) bool {
 	if err != nil {
 		log.Fatal("Failed to parse origin", origin, err)
 	}
-	return func (r *http.Request) bool {
+	return func(r *http.Request) bool {
 		o := r.Header["Origin"]
 		if len(o) == 0 {
 			return true
