@@ -12,7 +12,7 @@ var webTemplate = template.Must(template.New("webTemplate").Parse(`
 <html>
 <head>
 <title>pinghub {{.Path}}</title>
-<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
 <script type="text/javascript">
     $(function() {
 
@@ -42,7 +42,7 @@ var webTemplate = template.Must(template.New("webTemplate").Parse(`
     });
 
     if (window["WebSocket"]) {
-        conn = new WebSocket("ws://localhost{{.Addr}}{{.Path}}");
+        conn = new WebSocket(document.location.href.replace(/^http/, 'ws'));
         conn.onclose = function(evt) {
             appendLog($("<div><b>Connection closed.</b></div>"))
         }
