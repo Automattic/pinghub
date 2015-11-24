@@ -32,32 +32,41 @@ func (h *hub) run() {
 		// Forward cmds to their path's channel queues.
 		switch cmd.cmd {
 		case SUBSCRIBE:
-			// Create a channel if needed.
-			if _, ok := h.channels[cmd.path]; !ok {
-				h.channels[cmd.path] = newChannel(h, cmd.path)
-				go h.channels[cmd.path].run()
-			}
-			// Give the connection a reference to its own channel.
-			cmd.conn.control <- h.channels[cmd.path]
-			h.channels[cmd.path].queue <- cmd
+			h.subscribe(cmd)
 		case PUBLISH:
-			if channel, ok := h.channels[cmd.path]; ok {
-				select {
-				case channel.queue <- cmd:
-				default:
-					h.remove(cmd.path)
-				}
-			}
+			h.publish(cmd)
 		case REMOVE:
-			h.remove(cmd.path)
+			h.remove(cmd)
 		default:
 			panic(fmt.Sprintf("unexpected hub cmd: %v\n", cmd))
 		}
 	}
 }
 
-func (h *hub) remove(path string) {
-	if _, ok := h.channels[path]; ok {
-		delete(h.channels, path)
+func (h *hub) subscribe(cmd command) {
+	// Create a channel if needed.
+	if _, ok := h.channels[cmd.path]; !ok {
+		h.channels[cmd.path] = newChannel(h, cmd.path)
+		go h.channels[cmd.path].run()
+	}
+	// Give the connection a reference to its own channel.
+	cmd.conn.control <- h.channels[cmd.path]
+	h.channels[cmd.path].queue <- cmd
+}
+
+func (h *hub) publish(cmd command) {
+	if channel, ok := h.channels[cmd.path]; ok {
+		select {
+		case channel.queue <- cmd:
+		default:
+			// Tried publishing to a closing channel.
+			h.remove(cmd)
+		}
+	}
+}
+
+func (h *hub) remove(cmd command) {
+	if _, ok := h.channels[cmd.path]; ok {
+		delete(h.channels, cmd.path)
 	}
 }
