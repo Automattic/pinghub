@@ -27,7 +27,11 @@ func (c *connection) run() {
 	c.h.queue <- command{cmd: SUBSCRIBE, conn: c, path: c.path}
 	c.channel = <-c.control
 	close(c.control)
-	defer func() { c.channel.queue <- command{cmd: UNSUBSCRIBE, conn: c, path: c.path} }()
+	incr("websockets", 1)
+	defer func() {
+		decr("websockets", 1)
+		c.channel.queue <- command{cmd: UNSUBSCRIBE, conn: c, path: c.path}
+	}()
 	go c.writer()
 	c.reader()
 }
@@ -38,6 +42,7 @@ func (c *connection) reader() {
 		if err != nil {
 			break
 		}
+		incr("conn.recv", 1)
 		c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
 	}
 	c.ws.Close()
@@ -49,6 +54,7 @@ func (c *connection) writer() {
 		if err != nil {
 			break
 		}
+		incr("conn.send", 1)
 	}
 	c.ws.Close()
 }
