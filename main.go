@@ -8,28 +8,26 @@ import (
 	"time"
 )
 
-var origin = flag.String("origin", "", "websocket server checks Origin headers against this scheme://host[:port]")
 
 func main() {
 	// Prepare the stoppable HTTP server
-	handler := newHandler(*origin)
-	http.Handle("/", handler)
 	server := &http.Server{
 		Addr: "127.0.0.1:8081",
-		Handler: handler,
 	}
 	hd := &httpdown.HTTP{
 		StopTimeout: 10 * time.Second,
 		KillTimeout: 1 * time.Second,
 	}
 
-	// Apply command line arguments
 	flag.StringVar(&server.Addr, "addr", server.Addr, "http service address")
 	flag.DurationVar(&hd.StopTimeout, "stop-timeout", hd.StopTimeout, "stop timeout")
 	flag.DurationVar(&hd.KillTimeout, "kill-timeout", hd.KillTimeout, "kill timeout")
+	origin := flag.String("origin", "", "websocket server checks Origin headers against this scheme://host[:port]")
 	flag.Parse()
 
 	// Start the server
+	server.Handler = newHandler(*origin)
+	http.Handle("/", server.Handler)
 	if err := httpdown.ListenAndServe(server, hd); err != nil {
 		panic(err)
 	}
