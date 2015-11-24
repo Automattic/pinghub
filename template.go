@@ -5,7 +5,7 @@ import (
 )
 
 type templateArgs struct {
-	Addr, Path string
+	Path string
 }
 
 var webTemplate = template.Must(template.New("webTemplate").Parse(`

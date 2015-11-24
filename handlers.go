@@ -81,7 +81,7 @@ func (gh getHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !validateRequest(w, r) {
 		return
 	}
-	webTemplate.Execute(w, templateArgs{*addr, r.URL.Path})
+	webTemplate.Execute(w, templateArgs{r.URL.Path})
 }
 
 type postHandler struct {
