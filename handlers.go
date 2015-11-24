@@ -29,7 +29,6 @@ func newWsHandler(hub *hub, origin string) wsHandler {
 func wsOriginChecker(origin string) func(r *http.Request) bool {
 	if origin == "" {
 		return func(r *http.Request) bool {
-			fmt.Println("wsOriginChecker true")
 			return true
 		}
 	}
