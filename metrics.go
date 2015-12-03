@@ -18,15 +18,15 @@ var m *metrics
 
 func init() {
 	m = &metrics{
-		log: os.Stderr,
-		reg: gometrics.DefaultRegistry,
+		log:  os.Stderr,
+		reg:  gometrics.DefaultRegistry,
 		tick: time.Duration(60) * time.Second,
 	}
 	flag.DurationVar(&m.tick, "metrics.tick", m.tick, "metrics: duration between reports")
 }
 
 func startMetrics() {
-	if ! flag.Parsed() {
+	if !flag.Parsed() {
 		flag.Parse()
 	}
 	m.start()

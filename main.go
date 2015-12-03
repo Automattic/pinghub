@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-
 func main() {
 	// Prepare the stoppable HTTP server
 	server := &http.Server{
