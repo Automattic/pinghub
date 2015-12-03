@@ -14,6 +14,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"testing/quick"
 	"time"
@@ -246,6 +247,8 @@ func post(t *testing.T, u *url.URL, message string) *http.Response {
 }
 
 type client struct {
+	sync.Mutex
+
 	method  bool
 	waiting bool
 	ws      *websocket.Conn
@@ -256,15 +259,13 @@ type client struct {
 
 func mockClient(method bool, origin string) *client {
 	if method == POST {
-		return &client{method, false, nil, nil, nil, origin}
+		return &client{method: method, origin: origin}
 	}
 	return &client{
-		method,
-		false,
-		nil,
-		make(chan struct{}),
-		[]string{},
-		origin,
+		method: method,
+		res:    make(chan struct{}),
+		rec:    []string{},
+		origin: origin,
 	}
 }
 
@@ -274,7 +275,9 @@ func (c *client) reader() {
 		if err != nil {
 			return
 		}
+		c.Lock()
 		c.rec = append(c.rec, string(message))
+		c.Unlock()
 		if c.waiting {
 			c.res <- struct{}{}
 		}
@@ -297,7 +300,10 @@ func (c *client) sendSync(t *testing.T, message string) {
 }
 
 func (c *client) readAll() string {
-	return strings.Join(c.rec, "")
+	c.Lock()
+	all := strings.Join(c.rec, "")
+	c.Unlock()
+	return all
 }
 
 func mockWs(t *testing.T, u *url.URL, c *client) (*websocket.Conn, error) {
