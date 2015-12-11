@@ -34,12 +34,18 @@ func decr(name string, i int64) {
 	m.decr(name, i)
 }
 
+func mark(name string, i int64) {
+	m.mark(name, i)
+}
+
 func (m metrics) report(conn net.Conn) {
 	defer conn.Close()
 	m.reg.Each(func(name string, m interface{}) {
 		switch m.(type) {
 		case gometrics.Counter:
 			fmt.Fprintf(conn, "%s.value %d\n", name, m.(gometrics.Counter).Count())
+		case gometrics.Meter:
+			fmt.Fprintf(conn, "%s5m.value %.3f\n", name, m.(gometrics.Meter).Rate5())
 		}
 	})
 }
@@ -50,4 +56,8 @@ func (m metrics) incr(name string, i int64) {
 
 func (m metrics) decr(name string, i int64) {
 	gometrics.GetOrRegisterCounter(name, m.reg).Dec(i)
+}
+
+func (m metrics) mark(name string, i int64) {
+	gometrics.GetOrRegisterMeter(name, m.reg).Mark(i)
 }
