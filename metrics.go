@@ -4,6 +4,7 @@ import (
 	"fmt"
 	gometrics "github.com/rcrowley/go-metrics"
 	"net"
+	"sort"
 )
 
 type metrics struct {
@@ -40,14 +41,21 @@ func mark(name string, i int64) {
 
 func (m metrics) report(conn net.Conn) {
 	defer conn.Close()
+	var names = []string{}
+	var metrics = make(map[string]string)
 	m.reg.Each(func(name string, m interface{}) {
+		names = append(names, name)
 		switch m.(type) {
 		case gometrics.Counter:
-			fmt.Fprintf(conn, "%s.value %d\n", name, m.(gometrics.Counter).Count())
+			metrics[name] = fmt.Sprintf("%s.value %d\n", name, m.(gometrics.Counter).Count())
 		case gometrics.Meter:
-			fmt.Fprintf(conn, "%s5m.value %.3f\n", name, m.(gometrics.Meter).Rate5())
+			metrics[name] = fmt.Sprintf("%s5m.value %.3f\n", name, m.(gometrics.Meter).Rate5())
 		}
 	})
+	sort.Strings(names)
+	for _, name := range names {
+		conn.Write([]byte(metrics[name]))
+	}
 }
 
 func (m metrics) incr(name string, i int64) {
