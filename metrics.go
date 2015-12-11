@@ -8,7 +8,7 @@ import (
 )
 
 type metrics struct {
-	reg  gometrics.Registry
+	reg gometrics.Registry
 }
 
 var m = &metrics{reg: gometrics.DefaultRegistry}
