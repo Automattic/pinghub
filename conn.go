@@ -42,8 +42,8 @@ func (c *connection) reader() {
 		if err != nil {
 			break
 		}
-		incr("conn.recv", 1)
 		c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
+		mark("websocketmsgs", 1)
 	}
 	c.ws.Close()
 }
@@ -54,7 +54,7 @@ func (c *connection) writer() {
 		if err != nil {
 			break
 		}
-		incr("conn.send", 1)
+		mark("sends", 1)
 	}
 	c.ws.Close()
 }

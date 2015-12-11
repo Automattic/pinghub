@@ -26,7 +26,12 @@ func main() {
 
 	// Initialize metrics registry with expected stats
 	go startMetrics()
-	incr("websockets", 0)
+	incr("websockets", 0)    // number of connected websockets
+	incr("channels", 0)      // number of subscribed channels
+	mark("postmsgs", 0)      // rate of POST messages
+	mark("websocketmsgs", 0) // rate of WS messages
+	mark("drops", 0)         // rate of messages sent to nobody
+	mark("sends", 0)         // rate of messages sent to somebody
 
 	// Start the server
 	server.Handler = newHandler(*origin)

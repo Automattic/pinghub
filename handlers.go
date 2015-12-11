@@ -98,6 +98,7 @@ func (ph postHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	ph.hub.queue <- command{cmd: PUBLISH, path: r.URL.Path, text: body}
 	w.Write([]byte("OK\n"))
+	mark("postmsgs", 1)
 }
 
 func validateRequest(w http.ResponseWriter, r *http.Request) bool {

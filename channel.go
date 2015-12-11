@@ -38,14 +38,12 @@ func (c *channel) stop() {
 
 func (c *channel) subscribe(conn *connection) {
 	c.connections[conn] = nil
-	incr("channel.subscribe", 1)
 }
 
 func (c *channel) unsubscribe(conn *connection) {
 	if _, ok := c.connections[conn]; ok {
 		close(conn.send)
 		delete(c.connections, conn)
-		incr("channel.unsubscribe", 1)
 	}
 }
 
@@ -53,10 +51,8 @@ func (c *channel) publish(text []byte) {
 	for conn := range c.connections {
 		select {
 		case conn.send <- text:
-			incr("channel.publish.send", 1)
 		default:
 			c.unsubscribe(conn)
 		}
 	}
-	incr("channel.publish", 1)
 }

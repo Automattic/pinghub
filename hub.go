@@ -48,31 +48,27 @@ func (h *hub) subscribe(cmd command) {
 	if _, ok := h.channels[cmd.path]; !ok {
 		h.channels[cmd.path] = newChannel(h, cmd.path)
 		go h.channels[cmd.path].run()
-		incr("hub.subscribe.newChannel", 1)
-		incr("hub.channels", 1)
 	}
 	// Give the connection a reference to its own channel.
 	cmd.conn.control <- h.channels[cmd.path]
 	h.channels[cmd.path].queue <- cmd
-	incr("hub.subscribe", 1)
 }
 
 func (h *hub) publish(cmd command) {
 	if channel, ok := h.channels[cmd.path]; ok {
 		select {
 		case channel.queue <- cmd:
-			incr("hub.publish", 1)
 		default:
 			// Tried publishing to a closing channel.
 			h.remove(cmd)
 		}
+	} else {
+		mark("drops", 1)
 	}
 }
 
 func (h *hub) remove(cmd command) {
 	if _, ok := h.channels[cmd.path]; ok {
 		delete(h.channels, cmd.path)
-		incr("hub.remove", 1)
-		decr("hub.channels", 1)
 	}
 }
