@@ -1,39 +1,29 @@
 package main
 
 import (
-	"flag"
+	"fmt"
 	gometrics "github.com/rcrowley/go-metrics"
-	"io"
-	"os"
-	"time"
+	"net"
 )
 
 type metrics struct {
-	log  io.Writer
 	reg  gometrics.Registry
-	tick time.Duration
 }
 
-var m *metrics
-
-func init() {
-	m = &metrics{
-		log:  os.Stderr,
-		reg:  gometrics.DefaultRegistry,
-		tick: time.Duration(60) * time.Second,
-	}
-	flag.DurationVar(&m.tick, "metrics.tick", m.tick, "metrics: duration between reports")
-}
+var m = &metrics{reg: gometrics.DefaultRegistry}
 
 func startMetrics() {
-	if !flag.Parsed() {
-		flag.Parse()
+	ln, err := net.Listen("tcp", "127.0.0.1:8082")
+	if err != nil {
+		panic(err)
 	}
-	m.start()
-}
-
-func finalMetrics() {
-	m.writeOnce()
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			panic(err)
+		}
+		go m.report(conn)
+	}
 }
 
 func incr(name string, i int64) {
@@ -44,12 +34,14 @@ func decr(name string, i int64) {
 	m.decr(name, i)
 }
 
-func (m metrics) start() {
-	go gometrics.WriteJSON(m.reg, m.tick, m.log)
-}
-
-func (m metrics) writeOnce() {
-	gometrics.WriteJSONOnce(m.reg, m.log)
+func (m metrics) report(conn net.Conn) {
+	defer conn.Close()
+	m.reg.Each(func(name string, m interface{}) {
+		switch m.(type) {
+		case gometrics.Counter:
+			fmt.Fprintf(conn, "%s.value %d\n", name, m.(gometrics.Counter).Count())
+		}
+	})
 }
 
 func (m metrics) incr(name string, i int64) {

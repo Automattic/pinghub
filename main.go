@@ -24,9 +24,9 @@ func main() {
 	origin := flag.String("origin", "", "websocket server checks Origin headers against this scheme://host[:port]")
 	flag.Parse()
 
-	// Start the metrics subsystem
-	startMetrics()
-	defer finalMetrics()
+	// Initialize metrics registry with expected stats
+	go startMetrics()
+	incr("websockets", 0)
 
 	// Start the server
 	server.Handler = newHandler(*origin)
