@@ -1,0 +1,21 @@
+[submodule "vendor/github.com/facebookgo/clock"]
+	path = vendor/github.com/facebookgo/clock
+	url = git://github.com/facebookgo/clock
+[submodule "vendor/github.com/facebookgo/httpdown"]
+	path = vendor/github.com/facebookgo/httpdown
+	url = git://github.com/facebookgo/httpdown
+[submodule "vendor/github.com/facebookgo/stats"]
+	path = vendor/github.com/facebookgo/stats
+	url = git://github.com/facebookgo/stats
+[submodule "vendor/github.com/gorilla/context"]
+	path = vendor/github.com/gorilla/context
+	url = git://github.com/gorilla/context
+[submodule "vendor/github.com/gorilla/mux"]
+	path = vendor/github.com/gorilla/mux
+	url = git://github.com/gorilla/mux
+[submodule "vendor/github.com/gorilla/websocket"]
+	path = vendor/github.com/gorilla/websocket
+	url = git://github.com/gorilla/websocket
+[submodule "vendor/github.com/rcrowley/go-metrics"]
+	path = vendor/github.com/rcrowley/go-metrics
+	url = git://github.com/rcrowley/go-metrics
