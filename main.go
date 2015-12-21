@@ -2,30 +2,29 @@ package main
 
 import (
 	"flag"
-	"github.com/facebookgo/httpdown"
 	"github.com/gorilla/mux"
+	"net"
 	"net/http"
-	"time"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 )
 
 func main() {
-	// Prepare the stoppable HTTP server
+	// Prepare the HTTP server
 	server := &http.Server{
 		Addr: "127.0.0.1:8081",
 	}
-	hd := &httpdown.HTTP{
-		StopTimeout: 10 * time.Second,
-		KillTimeout: 1 * time.Second,
-	}
 
-	flag.StringVar(&server.Addr, "addr", server.Addr, "http service address")
-	flag.DurationVar(&hd.StopTimeout, "stop-timeout", hd.StopTimeout, "stop timeout")
-	flag.DurationVar(&hd.KillTimeout, "kill-timeout", hd.KillTimeout, "kill timeout")
+	metricsPort := "8082"
+	flag.StringVar(&metricsPort, "mport", metricsPort, "metrics service port")
+	flag.StringVar(&server.Addr, "addr", server.Addr, "http service address (TCP address or absolute path for UNIX socket)")
 	origin := flag.String("origin", "", "websocket server checks Origin headers against this scheme://host[:port]")
 	flag.Parse()
 
 	// Initialize metrics registry with expected stats
-	go startMetrics()
+	go startMetrics(metricsPort)
 	incr("websockets", 0)    // number of connected websockets
 	incr("channels", 0)      // number of subscribed channels
 	mark("postmsgs", 0)      // rate of POST messages
@@ -36,9 +35,26 @@ func main() {
 	// Start the server
 	server.Handler = newHandler(*origin)
 	http.Handle("/", server.Handler)
-	if err := httpdown.ListenAndServe(server, hd); err != nil {
-		panic(err)
+	if strings.HasPrefix(server.Addr, "/") {
+		ln, err := net.Listen("unix", server.Addr)
+		if err != nil {
+			panic(err)
+		}
+		closeListenerOnSignals(ln)
+		server.Serve(ln)
+	} else {
+		server.ListenAndServe()
 	}
+}
+
+func closeListenerOnSignals(ln net.Listener) {
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGTERM)
+	go func(c chan os.Signal) {
+		<-c
+		ln.Close()
+		os.Exit(0)
+	}(sigc)
 }
 
 func newHandler(origin string) http.Handler {
