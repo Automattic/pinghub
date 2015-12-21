@@ -18,6 +18,8 @@ func main() {
 		KillTimeout: 1 * time.Second,
 	}
 
+	metricsPort := "8082"
+	flag.StringVar(&metricsPort, "mport", metricsPort, "metrics service port")
 	flag.StringVar(&server.Addr, "addr", server.Addr, "http service address")
 	flag.DurationVar(&hd.StopTimeout, "stop-timeout", hd.StopTimeout, "stop timeout")
 	flag.DurationVar(&hd.KillTimeout, "kill-timeout", hd.KillTimeout, "kill timeout")
@@ -25,7 +27,7 @@ func main() {
 	flag.Parse()
 
 	// Initialize metrics registry with expected stats
-	go startMetrics()
+	go startMetrics(metricsPort)
 	incr("websockets", 0)    // number of connected websockets
 	incr("channels", 0)      // number of subscribed channels
 	mark("postmsgs", 0)      // rate of POST messages
