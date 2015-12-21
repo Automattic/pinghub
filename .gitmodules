@@ -1,12 +1,3 @@
-[submodule "vendor/github.com/facebookgo/clock"]
-	path = vendor/github.com/facebookgo/clock
-	url = git://github.com/facebookgo/clock
-[submodule "vendor/github.com/facebookgo/httpdown"]
-	path = vendor/github.com/facebookgo/httpdown
-	url = git://github.com/facebookgo/httpdown
-[submodule "vendor/github.com/facebookgo/stats"]
-	path = vendor/github.com/facebookgo/stats
-	url = git://github.com/facebookgo/stats
 [submodule "vendor/github.com/gorilla/context"]
 	path = vendor/github.com/gorilla/context
 	url = git://github.com/gorilla/context
