@@ -48,6 +48,9 @@ func (c *channel) unsubscribe(conn *connection) {
 }
 
 func (c *channel) publish(text []byte) {
+	if len(text) == 0 {
+		return
+	}
 	for conn := range c.connections {
 		select {
 		case conn.send <- text:
