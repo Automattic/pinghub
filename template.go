@@ -43,6 +43,7 @@ var webTemplate = template.Must(template.New("webTemplate").Parse(`
 
     if (window["WebSocket"]) {
         conn = new WebSocket(document.location.href.replace(/^http/, 'ws'));
+        setInterval(function(){conn.send('');}, 30000);
         conn.onclose = function(evt) {
             appendLog($("<div><b>Connection closed.</b></div>"))
         }
