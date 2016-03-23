@@ -168,7 +168,7 @@ func testClientsN(t *testing.T, numClients int, path string) {
 		c := clients[i]
 		if c.method == WS {
 			expected := strings.Join(hub.receiveAll(path, c), "")
-			got := c.readAll()
+			got := strings.Join(c.readAll(), "")
 			if expected != got {
 				t.Fatal("expected", expected, "got", got)
 			}
@@ -204,6 +204,9 @@ func (h *fakeHub) subscribe(path string, c *client) {
 
 func (h *fakeHub) send(path string, message string) {
 	if _, ok := h.m[path]; !ok {
+		return
+	}
+	if message == "" {
 		return
 	}
 	for c := range h.m[path] {
@@ -286,22 +289,31 @@ func (c *client) reader() {
 
 // Send a message and block until echo is received
 func (c *client) sendSync(t *testing.T, message string) {
-	c.waiting = true
+	if message != "" {
+		c.waiting = true
+	}
 	err := c.ws.WriteMessage(
 		websocket.TextMessage, []byte(message))
 	if err != nil {
 		t.Fatal("WriteMessage:", err)
 	}
-	_, ok := <-c.res
-	if !ok {
-		t.Fatal("Failed waiting for echo.")
+	if message != "" {
+		ok := false
+		select {
+		case _, ok = <-c.res:
+			c.waiting = false
+		case <-time.After(time.Second * 1):
+			ok = false
+		}
+		if !ok {
+			t.Fatal("Failed waiting for echo.")
+		}
 	}
-	c.waiting = false
 }
 
-func (c *client) readAll() string {
+func (c *client) readAll() []string {
 	c.Lock()
-	all := strings.Join(c.rec, "")
+	all := c.rec
 	c.Unlock()
 	return all
 }
