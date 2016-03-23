@@ -42,6 +42,9 @@ func (c *connection) reader() {
 		if err != nil {
 			break
 		}
+		if len(message) == 0 {
+			continue
+		}
 		c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
 		mark("websocketmsgs", 1)
 	}
