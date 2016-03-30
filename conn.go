@@ -61,7 +61,9 @@ func (c *connection) reader() {
 		if err != nil {
 			break
 		}
+		// empty message: echo only, no broadcast
 		if len(message) == 0 {
+			c.send <- []byte{}
 			continue
 		}
 		c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
