@@ -86,10 +86,10 @@ func newHandler(origin string) http.Handler {
 	handler := mux.NewRouter()
 
 	// Route websocket requests
-	handler.Headers(
+	handler.NewRoute().HeadersRegexp(
 		// Requests with these headers will use this handler
-		"Connection", "Upgrade",
-		"Upgrade", "websocket",
+		"Connection", "[Uu]pgrade",
+		"Upgrade", "[Ww]ebsocket",
 	).Handler(newWsHandler(hub, origin))
 
 	// Route other GET and POST requests
