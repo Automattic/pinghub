@@ -3,12 +3,16 @@ Pinghub is a simple pubsub message bus for websocket clients. It also accepts me
 
 ### Command
 ```
-pinghub -addr=:8081 -origin=https://ws.example.com
+Usage of pinghub:
+  -addr string
+    	http service address (TCP address or absolute path for UNIX socket) (default "127.0.0.1:8081")
+  -log string
+    	Log file (absolute path)
+  -mport string
+    	metrics service port (default "8082")
+  -origin string
+    	websocket server checks Origin headers against this scheme://host[:port]
 ```
-
-`-addr` sets the TCP listen address ([net.Dial](https://golang.org/pkg/net/#Dial)). Default: `-addr=:8081`
-
-`-origin` enables checking the Origin header before starting the websocket handshake. Default: off.
 
 ### Security
 Pinghub validates Origin headers if started with the `-origin` option. Secure transport, authentication and authorization can be implemented by a reverse proxy or load balancer placed between clients and servers.
