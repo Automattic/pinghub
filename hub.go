@@ -5,16 +5,22 @@ import (
 )
 
 type hub struct {
-	queue    queue
-	channels channels
+	queue             queue
+	channels          channels
+	connectionManager connectionInterface
 }
 
 type channels map[string]*channel
 
+type connectionInterface interface {
+	hubSubscribe(cmd command, h *hub)
+}
+
 func newHub() *hub {
 	return &hub{
-		queue:    make(queue, 16),
-		channels: make(channels),
+		queue:             make(queue, 16),
+		channels:          make(channels),
+		connectionManager: connectionManager{},
 	}
 }
 
@@ -50,7 +56,7 @@ func (h *hub) subscribe(cmd command) {
 		go h.channels[cmd.path].run()
 	}
 	// Give the connection a reference to its own channel.
-	cmd.conn.control <- h.channels[cmd.path]
+	h.connectionManager.hubSubscribe(cmd, h)
 	h.channels[cmd.path].queue <- cmd
 }
 
@@ -71,4 +77,10 @@ func (h *hub) remove(cmd command) {
 	if _, ok := h.channels[cmd.path]; ok {
 		delete(h.channels, cmd.path)
 	}
+}
+
+type connectionManager struct{}
+
+func (cm connectionManager) hubSubscribe(cmd command, h *hub) {
+	cmd.conn.control <- h.channels[cmd.path]
 }
