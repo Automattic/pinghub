@@ -11,10 +11,6 @@ type hub struct {
 
 type channels map[string]*channel
 
-type connectionInterface interface {
-	hubSubscribe(cmd command, h *hub)
-}
-
 func newHub() *hub {
 	return &hub{
 		queue:    make(queue, 16),
