@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestSubscribe(t *testing.T) {
+func TestHubSubscribe(t *testing.T) {
 	h := newHub()
 
 	if len(h.channels) != 0 {
@@ -34,7 +34,7 @@ func TestSubscribe(t *testing.T) {
 	}
 }
 
-func TestPublish(t *testing.T) {
+func TestHubPublish(t *testing.T) {
 	h := newHub()
 	// Publishing to a non-existant channel
 	// should drop message
@@ -53,7 +53,7 @@ func TestPublish(t *testing.T) {
 	}
 }
 
-func TestRemove(t *testing.T) {
+func TestHubRemove(t *testing.T) {
 	h := newHub()
 	h.subscribe(command{cmd: SUBSCRIBE, path: "/monkey", conn: newTestConnection()})
 	h.subscribe(command{cmd: SUBSCRIBE, path: "/banana", conn: newTestConnection()})
