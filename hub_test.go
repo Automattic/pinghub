@@ -75,7 +75,7 @@ func TestHubRun(t *testing.T) {
 
 	defer func() {
 		if r := recover(); r == nil {
-			t.Fatal("ERR: panic did not occur with invalid commnad")
+			t.Fatal("ERR: panic did not occur with invalid command")
 		}
 	}()
 
