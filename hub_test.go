@@ -37,7 +37,7 @@ func TestSubscribe(t *testing.T) {
 func TestPublish(t *testing.T) {
 	h := newHub()
 	// Publishing to a non-existant channel
-	// should drop meessage
+	// should drop message
 	h.publish(command{cmd: PUBLISH, path: "/monkey", text: []byte("banana 1"), conn: newTestConnection()})
 	if _, ok := h.channels["/monkey"]; ok {
 		t.Fatal("Expectation: Channel should not exist without a Subscriber")
