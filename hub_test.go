@@ -68,6 +68,20 @@ func TestHubRemove(t *testing.T) {
 	}
 }
 
+func TestHubRun(t *testing.T) {
+	h := newHub()
+	cmd := command{cmd: 99, path: "/monkey", conn: newTestConnection()}
+	h.queue <- cmd
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("ERR: panic did not occur with invalid commnad")
+		}
+	}()
+
+	h.run()
+}
+
 func newTestConnection() *connection {
 	return &connection{
 		control: make(chan *channel, 1),
