@@ -7,7 +7,7 @@ import (
 func TestChannelSubscribe(t *testing.T) {
 	c := newChannel(newHub(), "/monkey")
 
-	// Assert no channels exist
+	// Assert no connections exist
 	if len(c.connections) != 0 {
 		t.Fatal("Error in test enviroment, Expectation: 0, Received:", len(c.connections))
 	}
@@ -22,7 +22,7 @@ func TestChannelPublish(t *testing.T) {
 	c := newChannel(newHub(), "/monkey")
 	conn := newTestConnection()
 
-	// Assert no channels exist
+	// Assert no connections exist
 	if len(c.connections) != 0 {
 		t.Fatal("Error in test enviroment, Expectation: 0, Received:", len(c.connections))
 	}
