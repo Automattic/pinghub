@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -13,9 +15,22 @@ func TestHubSubscribe(t *testing.T) {
 
 	// subscribing to a new path should
 	// add a (1) channel to the hub
-	h.subscribe(command{cmd: SUBSCRIBE, path: "/monkey", conn: newTestConnection()})
+	cmd := command{cmd: SUBSCRIBE, path: "/monkey", conn: newTestConnection()}
+	h.subscribe(cmd)
 	if len(h.channels) != 1 {
 		t.Fatal("Expectation: 1, Received:", len(h.channels))
+	}
+
+	// subscribing should give connection
+	// a reference to its own channel
+	subchannel := <-cmd.conn.control
+	if !reflect.DeepEqual(subchannel, h.channels[cmd.path]) {
+		t.Fatal(fmt.Printf("Expectation: %+v\n Received: %+v\n", h.channels[cmd.path], subchannel))
+	}
+
+	c := <-h.channels[cmd.path].queue
+	if !reflect.DeepEqual(c, cmd) {
+		t.Fatal(fmt.Printf("Expectation: %+v\n Received: %+v\n", cmd, c))
 	}
 
 	// subscribing to the same path multiple times
@@ -28,6 +43,7 @@ func TestHubSubscribe(t *testing.T) {
 		t.Fatal("Expectation: 1, Received:", len(h.channels))
 	}
 
+	// subscribing to a new path opens a new channel
 	h.subscribe(command{cmd: SUBSCRIBE, path: "/banana", conn: newTestConnection()})
 	if len(h.channels) != 2 {
 		t.Fatal("Expectation: 2, Received:", len(h.channels))
