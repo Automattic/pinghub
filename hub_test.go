@@ -85,5 +85,6 @@ func TestHubRun(t *testing.T) {
 func newTestConnection() *connection {
 	return &connection{
 		control: make(chan *channel, 1),
+		send:    make(chan []byte, 256),
 	}
 }
