@@ -26,6 +26,7 @@ type connection struct {
 	ws      *websocket.Conn
 	h       *hub
 	path    string
+	w       websocketManager
 }
 
 func newConnection(ws *websocket.Conn, h *hub, path string) *connection {
@@ -35,6 +36,7 @@ func newConnection(ws *websocket.Conn, h *hub, path string) *connection {
 		ws:      ws,
 		h:       h,
 		path:    path,
+		w:       websocketInteractor{ws: ws},
 	}
 }
 
@@ -52,12 +54,12 @@ func (c *connection) run() {
 }
 
 func (c *connection) reader() {
-	c.ws.SetReadLimit(maxMessageSize)
-	c.ws.SetReadDeadline(time.Now().Add(pongWait))
-	c.ws.SetPongHandler(func(s string) error { c.ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	c.w.wsSetReadLimit()
+	c.w.wsSetReadDeadline()
+	c.w.wsSetPongHandler()
 
 	for {
-		_, message, err := c.ws.ReadMessage()
+		_, message, err := c.w.wsReadMessage()
 		if err != nil {
 			break
 		}
@@ -66,12 +68,12 @@ func (c *connection) reader() {
 			c.send <- []byte{}
 			continue
 		}
+
 		c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
 		mark("websocketmsgs", 1)
 	}
-	c.ws.Close()
+	c.w.wsClose()
 }
-
 func (c *connection) writer() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -100,4 +102,36 @@ func (c *connection) writer() {
 func (c *connection) write(mt int, payload []byte) error {
 	c.ws.SetWriteDeadline(time.Now().Add(writeWait))
 	return c.ws.WriteMessage(mt, payload)
+}
+
+type websocketManager interface {
+	wsSetReadLimit()
+	wsSetReadDeadline()
+	wsSetPongHandler()
+	wsReadMessage() (int, []byte, error)
+	wsClose()
+}
+
+type websocketInteractor struct {
+	ws *websocket.Conn
+}
+
+func (w websocketInteractor) wsSetReadLimit() {
+	w.ws.SetReadLimit(maxMessageSize)
+}
+
+func (w websocketInteractor) wsSetReadDeadline() {
+	w.ws.SetReadDeadline(time.Now().Add(pongWait))
+}
+
+func (w websocketInteractor) wsSetPongHandler() {
+	w.ws.SetPongHandler(func(s string) error { w.wsSetReadDeadline(); return nil })
+}
+
+func (w websocketInteractor) wsClose() {
+	w.ws.Close()
+}
+
+func (w websocketInteractor) wsReadMessage() (messageType int, p []byte, err error) {
+	return w.ws.ReadMessage()
 }
