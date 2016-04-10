@@ -7,7 +7,7 @@ import (
 )
 
 func TestConnWriterErr(t *testing.T) {
-	conn := newTestConnectionWS()
+	conn := newTestConnection()
 	conn.w = mockWsInteractor{err: errors.New("Message Read Error")}
 
 	conn.reader()
@@ -22,7 +22,7 @@ func TestConnWriterErr(t *testing.T) {
 }
 
 func TestConnWriterMessage(t *testing.T) {
-	conn := newTestConnectionWS()
+	conn := newTestConnection()
 	conn.w = mockWsInteractor{msg: []byte("banana")}
 
 	defer func() {
@@ -38,7 +38,7 @@ func TestConnWriterMessage(t *testing.T) {
 }
 
 func TestConnWriterNilMessage(t *testing.T) {
-	conn := newTestConnectionWS()
+	conn := newTestConnection()
 	conn.w = mockWsInteractor{msg: []byte("")}
 
 	if len(conn.send) != 0 {
@@ -57,11 +57,18 @@ func TestConnWriterNilMessage(t *testing.T) {
 	panic("kill infinite loop")
 }
 
-func newTestConnectionWS() *connection {
-	conn := newTestConnection()
-	conn.channel = &channel{queue: make(queue, 16), path: "/monkey"}
-	conn.send = make(chan []byte, 256)
-	return conn
+// func newTestConnectionWS() *connection {
+// 	conn := newTestConnection()
+// 	conn.channel = &channel{queue: make(queue, 16), path: "/monkey"}
+// 	return conn
+// }
+
+func newTestConnection() *connection {
+	return &connection{
+		control: make(chan *channel, 1),
+		send:    make(chan []byte, 256),
+		channel: &channel{queue: make(queue, 16), path: "/monkey"},
+	}
 }
 
 type mockWsInteractor struct {
