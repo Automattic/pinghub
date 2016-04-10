@@ -57,12 +57,6 @@ func TestConnWriterNilMessage(t *testing.T) {
 	panic("kill infinite loop")
 }
 
-// func newTestConnectionWS() *connection {
-// 	conn := newTestConnection()
-// 	conn.channel = &channel{queue: make(queue, 16), path: "/monkey"}
-// 	return conn
-// }
-
 func newTestConnection() *connection {
 	return &connection{
 		control: make(chan *channel, 1),
