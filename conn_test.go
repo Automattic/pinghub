@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestConnWriterErr(t *testing.T) {
+func TestConnReaderErr(t *testing.T) {
 	conn := newTestConnection()
 	conn.w = mockWsInteractor{err: errors.New("Message Read Error")}
 
@@ -21,7 +21,7 @@ func TestConnWriterErr(t *testing.T) {
 	}
 }
 
-func TestConnWriterMessage(t *testing.T) {
+func TestConnReaderMessage(t *testing.T) {
 	conn := newTestConnection()
 	conn.w = mockWsInteractor{msg: []byte("banana")}
 
@@ -37,7 +37,7 @@ func TestConnWriterMessage(t *testing.T) {
 	panic("kill infinite loop")
 }
 
-func TestConnWriterNilMessage(t *testing.T) {
+func TestConnReaderNilMessage(t *testing.T) {
 	conn := newTestConnection()
 	conn.w = mockWsInteractor{msg: []byte("")}
 
