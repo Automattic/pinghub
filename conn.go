@@ -58,13 +58,16 @@ func (c *connection) reader() {
 	c.w.wsSetReadDeadline()
 	c.w.wsSetPongHandler()
 
+	defer func() {
+		c.ws.Close()
+	}()
+
 	for {
 		err := c.readMessage()
 		if err != nil {
 			break
 		}
 	}
-	c.w.wsClose()
 }
 
 func (c *connection) readMessage() (err error) {
