@@ -59,7 +59,7 @@ func (c *connection) reader() {
 	c.w.wsSetPongHandler()
 
 	for {
-		err := c.processReadMessage()
+		err := c.readMessage()
 		if err != nil {
 			break
 		}
@@ -67,7 +67,7 @@ func (c *connection) reader() {
 	c.w.wsClose()
 }
 
-func (c *connection) processReadMessage() (err error) {
+func (c *connection) readMessage() (err error) {
 	_, message, err := c.w.wsReadMessage()
 	if err != nil {
 		return err
