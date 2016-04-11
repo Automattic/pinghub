@@ -3,58 +3,51 @@ package main
 import (
 	"errors"
 	"testing"
-	"time"
 )
 
-func TestConnReaderErr(t *testing.T) {
+func TestConnProcessReadMessage(t *testing.T) {
 	conn := newTestConnection()
-	conn.w = mockWsInteractor{err: errors.New("Message Read Error")}
 
-	conn.reader()
+	// Assert on error, do nothing
+	conn.w = mockWsInteractor{err: errors.New("Message Read Error")}
+	err := conn.processReadMessage()
+
+	if err == nil {
+		t.Fatal("No Error Returned")
+	}
 
 	if len(conn.send) != 0 {
-		t.Fatal("Expectation: send channel length should be > 0, Received:", len(conn.send))
+		t.Fatal("Expectation: send channel length should be 0, Received:", len(conn.send))
 	}
 
 	if len(conn.channel.queue) != 0 {
-		t.Fatal("Expectation: conn channel length should be > 0, Received:", len(conn.channel.queue))
+		t.Fatal("Expectation: conn channel length should be 0, Received:", len(conn.channel.queue))
 	}
-}
 
-func TestConnReaderMessage(t *testing.T) {
-	conn := newTestConnection()
+	// On receipt of non-nil message, message is posted to queue
 	conn.w = mockWsInteractor{msg: []byte("banana")}
+	err = conn.processReadMessage()
 
-	defer func() {
-		if r := recover(); r != nil {
-			cmd := <-conn.channel.queue
-			if string(cmd.text) != "banana" {
-				t.Fatal("Expectation: banana, Received:", string(cmd.text))
-			}
-		}
-	}()
-	go conn.reader()
-	panic("kill infinite loop")
-}
-
-func TestConnReaderNilMessage(t *testing.T) {
-	conn := newTestConnection()
-	conn.w = mockWsInteractor{msg: []byte("")}
-
-	if len(conn.send) != 0 {
-		t.Fatal("Expectation: 0, Received:", len(conn.send))
+	cmd := <-conn.channel.queue
+	if string(cmd.text) != "banana" {
+		t.Fatal("Expectation: banana, Received:", string(cmd.text))
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			// wait to eliminate possibility of race condition
-			time.Sleep(time.Nanosecond * 50000000)
-			if len(conn.send) == 0 {
-				t.Fatal("Expectation: send channel length should be > 0, Received:", len(conn.send))
-			}
-		}
-	}()
-	go conn.reader()
-	panic("kill infinite loop")
+
+	if err != nil {
+		t.Fatal("Expectation: Error should be nil, Received:", err)
+	}
+
+	// On receipt of nil message, nil message published to conn.send
+	conn.w = mockWsInteractor{msg: []byte("")}
+	err = conn.processReadMessage()
+
+	if len(conn.send) != 1 {
+		t.Fatal("Expectation: send channel length should be 1, Received:", len(conn.send))
+	}
+
+	if err != nil {
+		t.Fatal("Expectation: Error should be nil, Received:", err)
+	}
 }
 
 func newTestConnection() *connection {
