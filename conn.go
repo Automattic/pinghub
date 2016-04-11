@@ -59,21 +59,30 @@ func (c *connection) reader() {
 	c.w.wsSetPongHandler()
 
 	for {
-		_, message, err := c.w.wsReadMessage()
+		err := c.processReadMessage()
 		if err != nil {
 			break
 		}
-		// empty message: echo only, no broadcast
-		if len(message) == 0 {
-			c.send <- []byte{}
-			continue
-		}
-
-		c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
-		mark("websocketmsgs", 1)
 	}
 	c.w.wsClose()
 }
+
+func (c *connection) processReadMessage() (err error) {
+	_, message, err := c.w.wsReadMessage()
+	if err != nil {
+		return err
+	}
+	// empty message: echo only, no broadcast
+	if len(message) == 0 {
+		c.send <- []byte{}
+		return
+	}
+
+	c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
+	mark("websocketmsgs", 1)
+	return
+}
+
 func (c *connection) writer() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
