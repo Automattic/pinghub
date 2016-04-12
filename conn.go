@@ -23,7 +23,6 @@ type connection struct {
 	control chan *channel
 	channel *channel
 	send    chan []byte
-	ws      *websocket.Conn
 	h       *hub
 	path    string
 	w       websocketManager
@@ -33,7 +32,6 @@ func newConnection(ws *websocket.Conn, h *hub, path string) *connection {
 	return &connection{
 		control: make(chan *channel, 1),
 		send:    make(chan []byte, 256),
-		ws:      ws,
 		h:       h,
 		path:    path,
 		w:       websocketInteractor{ws: ws},
@@ -59,7 +57,7 @@ func (c *connection) reader() {
 	c.w.wsSetPongHandler()
 
 	defer func() {
-		c.ws.Close()
+		c.w.wsClose()
 	}()
 
 	for {
@@ -89,7 +87,7 @@ func (c *connection) writer(pingPeriod time.Duration) {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.ws.Close()
+		c.w.wsClose()
 	}()
 	for {
 		select {
