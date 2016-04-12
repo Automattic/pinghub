@@ -49,7 +49,7 @@ func (c *connection) run() {
 		decr("websockets", 1)
 		c.channel.queue <- command{cmd: UNSUBSCRIBE, conn: c, path: c.path}
 	}()
-	go c.writer()
+	go c.writer(pingPeriod)
 	c.reader()
 }
 
@@ -80,13 +80,12 @@ func (c *connection) readMessage() (err error) {
 		c.send <- []byte{}
 		return
 	}
-
 	c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
 	mark("websocketmsgs", 1)
 	return
 }
 
-func (c *connection) writer() {
+func (c *connection) writer(pingPeriod time.Duration) {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
@@ -102,6 +101,7 @@ func (c *connection) writer() {
 			if err := c.write(websocket.TextMessage, message); err != nil {
 				return
 			}
+
 			mark("sends", 1)
 		case <-ticker.C:
 			if err := c.write(websocket.PingMessage, []byte{}); err != nil {
@@ -112,8 +112,8 @@ func (c *connection) writer() {
 }
 
 func (c *connection) write(mt int, payload []byte) error {
-	c.ws.SetWriteDeadline(time.Now().Add(writeWait))
-	return c.ws.WriteMessage(mt, payload)
+	c.w.wsSetWriteDeadline()
+	return c.w.wsWriteMessage(mt, payload)
 }
 
 type websocketManager interface {
@@ -121,6 +121,8 @@ type websocketManager interface {
 	wsSetReadDeadline()
 	wsSetPongHandler()
 	wsReadMessage() (int, []byte, error)
+	wsSetWriteDeadline()
+	wsWriteMessage(int, []byte) error
 	wsClose()
 }
 
@@ -146,4 +148,12 @@ func (w websocketInteractor) wsClose() {
 
 func (w websocketInteractor) wsReadMessage() (messageType int, p []byte, err error) {
 	return w.ws.ReadMessage()
+}
+
+func (w websocketInteractor) wsSetWriteDeadline() {
+	w.ws.SetWriteDeadline(time.Now().Add(writeWait))
+}
+
+func (w websocketInteractor) wsWriteMessage(messageType int, payload []byte) error {
+	return w.ws.WriteMessage(messageType, payload)
 }

@@ -3,7 +3,11 @@ package main
 import (
 	"errors"
 	"testing"
+	"time"
 )
+
+var testWrite []byte
+var testInt int
 
 func TestConnReadMessage(t *testing.T) {
 	conn := newTestConnection()
@@ -50,6 +54,36 @@ func TestConnReadMessage(t *testing.T) {
 	}
 }
 
+func TestConnWriter(t *testing.T) {
+	conn := newTestConnection()
+	conn.w = mockWsInteractor{}
+
+	go conn.writer(2 * time.Second)
+	conn.send <- []byte("bananas")
+
+	// On receipt of valid message, message written
+	// with type websocket.TextMessage
+	time.Sleep(5)
+	if string(testWrite) != "bananas" {
+		t.Fatal("Expectation: bananas, Received:", string(testWrite))
+	}
+
+	if testInt != 1 {
+		t.Fatal("Expectation: 1, Received:", testInt)
+	}
+
+	// On timed intervals, ping with nil message
+	// and type websocket.PingMessage
+	time.Sleep(3 * time.Second)
+	if string(testWrite) != "" {
+		t.Fatal("Expectation: nil, Received:", string(testWrite))
+	}
+	if testInt != 9 {
+		t.Fatal("Expectation: 9, Received:", testInt)
+	}
+
+}
+
 func newTestConnection() *connection {
 	return &connection{
 		control: make(chan *channel, 1),
@@ -71,6 +105,14 @@ func (mq mockWsInteractor) wsSetPongHandler() {}
 
 func (mq mockWsInteractor) wsClose() {}
 
+func (mq mockWsInteractor) wsSetWriteDeadline() {}
+
 func (mq mockWsInteractor) wsReadMessage() (messageType int, p []byte, err error) {
 	return messageType, mq.msg, mq.err
+}
+
+func (mq mockWsInteractor) wsWriteMessage(messageType int, payload []byte) (err error) {
+	testInt = messageType
+	testWrite = payload
+	return mq.err
 }
