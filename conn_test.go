@@ -43,8 +43,13 @@ func TestConnReadMessage(t *testing.T) {
 
 	// On receipt of nil message, nil message published to conn.send
 	conn.w = mockWsInteractor{msg: []byte("")}
-	err = conn.readMessage()
 
+	// Assert conn.send length = 0 before test begins
+	if len(conn.send) != 0 {
+		t.Fatal("Expectation: send channel length should be 0, Received:", len(conn.send))
+	}
+
+	err = conn.readMessage()
 	if len(conn.send) != 1 {
 		t.Fatal("Expectation: send channel length should be 1, Received:", len(conn.send))
 	}
