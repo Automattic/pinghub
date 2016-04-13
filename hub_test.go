@@ -97,10 +97,3 @@ func TestHubRun(t *testing.T) {
 
 	h.run()
 }
-
-func newTestConnection() *connection {
-	return &connection{
-		control: make(chan *channel, 1),
-		send:    make(chan []byte, 256),
-	}
-}
