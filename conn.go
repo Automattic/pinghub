@@ -33,7 +33,7 @@ func (c *connection) run() {
 		decr("websockets", 1)
 		c.channel.queue <- command{cmd: UNSUBSCRIBE, conn: c, path: c.path}
 	}()
-	go c.writer(pingPeriod)
+	go c.writer(c.h.ticker.Subscribe())
 	c.reader()
 }
 
@@ -69,12 +69,9 @@ func (c *connection) readMessage() (err error) {
 	return
 }
 
-func (c *connection) writer(pingPeriod time.Duration) {
-	ticker := time.NewTicker(pingPeriod)
-	defer func() {
-		ticker.Stop()
-		c.w.wsClose()
-	}()
+func (c *connection) writer(ticker <-chan time.Time) {
+	defer c.w.wsClose()
+
 	for {
 		select {
 		case message, ok := <-c.send:
@@ -87,7 +84,7 @@ func (c *connection) writer(pingPeriod time.Duration) {
 			}
 
 			mark("sends", 1)
-		case <-ticker.C:
+		case <-ticker:
 			if err := c.write(websocket.PingMessage, []byte{}); err != nil {
 				return
 			}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"github.com/VividCortex/multitick"
 	"testing"
 	"time"
 )
@@ -62,8 +63,9 @@ func TestConnReadMessage(t *testing.T) {
 func TestConnWriter(t *testing.T) {
 	conn := newTestConnection()
 	conn.w = mockWsInteractor{}
+	ticker := multitick.NewTicker(2*time.Second, time.Millisecond*-1)
 
-	go conn.writer(2 * time.Second)
+	go conn.writer(ticker.Subscribe())
 	conn.send <- []byte("bananas")
 
 	// On receipt of valid message, message written
