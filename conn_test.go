@@ -9,6 +9,7 @@ import (
 
 var testWrite []byte
 var testInt int
+var testWsClose bool
 
 func TestConnReadMessage(t *testing.T) {
 	conn := newTestConnection()
@@ -91,6 +92,22 @@ func TestConnWriter(t *testing.T) {
 
 }
 
+func TestSharedTicker(t *testing.T) {
+	testWsClose = false
+	ticker := multitick.NewTicker(1*time.Second, time.Millisecond*-1)
+
+	for i := 0; i < 10; i++ {
+		conn := newTestConnection()
+		conn.w = mockWsInteractor{}
+		go conn.writer(ticker.Subscribe())
+	}
+
+	time.Sleep(3 * time.Second)
+	if testWsClose == true {
+		t.Fatal("connection closed unexpectedly")
+	}
+}
+
 func newTestConnection() *connection {
 	return &connection{
 		control: make(chan *channel, 1),
@@ -110,7 +127,9 @@ func (mq mockWsInteractor) wsSetReadDeadline() {}
 
 func (mq mockWsInteractor) wsSetPongHandler() {}
 
-func (mq mockWsInteractor) wsClose() {}
+func (mq mockWsInteractor) wsClose() {
+	testWsClose = true
+}
 
 func (mq mockWsInteractor) wsSetWriteDeadline() {}
 
