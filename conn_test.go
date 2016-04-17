@@ -9,7 +9,7 @@ import (
 
 var testWrite []byte
 var testInt int
-var testWsClose bool
+var testTickerCount int
 
 func TestConnReadMessage(t *testing.T) {
 	conn := newTestConnection()
@@ -93,18 +93,25 @@ func TestConnWriter(t *testing.T) {
 }
 
 func TestSharedTicker(t *testing.T) {
-	testWsClose = false
-	ticker := multitick.NewTicker(1*time.Second, time.Millisecond*-1)
+	testTickerCount = 0
+	h := newHub()
+	h.ticker = multitick.NewTicker(2*time.Second, time.Millisecond*-1)
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 3; i++ {
 		conn := newTestConnection()
+		conn.path = "/monkey"
 		conn.w = mockWsInteractor{}
-		go conn.writer(ticker.Subscribe())
+		go conn.writer(h.ticker.Subscribe())
 	}
 
+	conn2 := newTestConnection()
+	conn2.path = "/banana"
+	conn2.w = mockWsInteractor{}
+	go conn2.writer(h.ticker.Subscribe())
+
 	time.Sleep(3 * time.Second)
-	if testWsClose == true {
-		t.Fatal("connection closed unexpectedly")
+	if testTickerCount < 4 {
+		t.Fatal("Expected: Ticker Count >= 4, Received:", testTickerCount)
 	}
 }
 
@@ -127,11 +134,11 @@ func (mq mockWsInteractor) wsSetReadDeadline() {}
 
 func (mq mockWsInteractor) wsSetPongHandler() {}
 
-func (mq mockWsInteractor) wsClose() {
-	testWsClose = true
-}
+func (mq mockWsInteractor) wsClose() {}
 
-func (mq mockWsInteractor) wsSetWriteDeadline() {}
+func (mq mockWsInteractor) wsSetWriteDeadline() {
+	testTickerCount = testTickerCount + 1
+}
 
 func (mq mockWsInteractor) wsReadMessage() (messageType int, p []byte, err error) {
 	return messageType, mq.msg, mq.err

@@ -70,15 +70,7 @@ func (c *connection) readMessage() (err error) {
 }
 
 func (c *connection) writer(ticker <-chan time.Time) {
-
-	defer func() {
-		// restart writer if panic occurs
-		// due to blocked ticker chan
-		if r := recover(); r != nil {
-			c.writer(ticker)
-		}
-		c.w.wsClose()
-	}()
+	defer c.w.wsClose()
 
 	for {
 		select {
