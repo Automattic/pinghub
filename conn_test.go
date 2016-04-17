@@ -97,21 +97,26 @@ func TestSharedTicker(t *testing.T) {
 	h := newHub()
 	h.ticker = multitick.NewTicker(2*time.Second, time.Millisecond*-1)
 
-	for i := 0; i < 3; i++ {
+	// create multiple connections on the same path
+	for i := 0; i < 9; i++ {
 		conn := newTestConnection()
 		conn.path = "/monkey"
 		conn.w = mockWsInteractor{}
 		go conn.writer(h.ticker.Subscribe())
 	}
 
+	// add connection on new path for control
 	conn2 := newTestConnection()
 	conn2.path = "/banana"
 	conn2.w = mockWsInteractor{}
 	go conn2.writer(h.ticker.Subscribe())
 
 	time.Sleep(3 * time.Second)
-	if testTickerCount < 4 {
-		t.Fatal("Expected: Ticker Count >= 4, Received:", testTickerCount)
+
+	// Assert connections on the same path are not blocked
+	// by shared ticker
+	if testTickerCount < 10 {
+		t.Fatal("Expected: Ticker Count >= 10, Received:", testTickerCount)
 	}
 }
 
