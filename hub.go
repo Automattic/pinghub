@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
+	"github.com/VividCortex/multitick"
+	"time"
 )
 
 type hub struct {
 	queue    queue
 	channels channels
+	ticker   *multitick.Ticker
 }
 
 type channels map[string]*channel
@@ -15,6 +18,7 @@ func newHub() *hub {
 	return &hub{
 		queue:    make(queue, 16),
 		channels: make(channels),
+		ticker:   multitick.NewTicker(pingPeriod, time.Millisecond*-1),
 	}
 }
 
@@ -28,6 +32,8 @@ func newChannel(h *hub, path string) *channel {
 }
 
 func (h *hub) run() {
+	defer h.ticker.Stop()
+
 	for cmd := range h.queue {
 		// Forward cmds to their path's channel queues.
 		switch cmd.cmd {
