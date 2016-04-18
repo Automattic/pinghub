@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/gorilla/websocket"
-	"time"
 )
 
 type connection struct {
@@ -33,7 +32,7 @@ func (c *connection) run() {
 		decr("websockets", 1)
 		c.channel.queue <- command{cmd: UNSUBSCRIBE, conn: c, path: c.path}
 	}()
-	go c.writer(c.h.ticker.Subscribe())
+	go c.writer()
 	c.reader()
 }
 
@@ -69,7 +68,8 @@ func (c *connection) readMessage() (err error) {
 	return
 }
 
-func (c *connection) writer(ticker <-chan time.Time) {
+func (c *connection) writer() {
+	ticker := c.h.ticker.Subscribe()
 	defer c.w.wsClose()
 
 	for {

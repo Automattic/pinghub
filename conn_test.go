@@ -62,11 +62,14 @@ func TestConnReadMessage(t *testing.T) {
 }
 
 func TestConnWriter(t *testing.T) {
+	h := newHub()
+	h.ticker = multitick.NewTicker(2*time.Second, time.Millisecond*-1)
+
 	conn := newTestConnection()
 	conn.w = mockWsInteractor{}
-	ticker := multitick.NewTicker(2*time.Second, time.Millisecond*-1)
+	conn.h = h
 
-	go conn.writer(ticker.Subscribe())
+	go conn.writer()
 	conn.send <- []byte("bananas")
 
 	// On receipt of valid message, message written
@@ -101,15 +104,17 @@ func TestSharedTicker(t *testing.T) {
 	for i := 0; i < 9; i++ {
 		conn := newTestConnection()
 		conn.path = "/monkey"
+		conn.h = h
 		conn.w = mockWsInteractor{}
-		go conn.writer(h.ticker.Subscribe())
+		go conn.writer()
 	}
 
 	// add connection on new path for control
 	conn2 := newTestConnection()
 	conn2.path = "/banana"
+	conn2.h = h
 	conn2.w = mockWsInteractor{}
-	go conn2.writer(h.ticker.Subscribe())
+	go conn2.writer()
 
 	time.Sleep(3 * time.Second)
 
