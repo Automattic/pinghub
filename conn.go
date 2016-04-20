@@ -69,8 +69,11 @@ func (c *connection) readMessage() (err error) {
 }
 
 func (c *connection) writer() {
-	ticker := c.h.ticker.Subscribe()
-	defer c.w.wsClose()
+	subscriber := c.h.ticker.subscribe()
+	defer func() {
+		c.h.ticker.unsubscribe(subscriber)
+		c.w.wsClose()
+	}()
 
 	for {
 		select {
@@ -84,7 +87,7 @@ func (c *connection) writer() {
 			}
 
 			mark("sends", 1)
-		case <-ticker:
+		case <-subscriber.tick:
 			if err := c.write(websocket.PingMessage, []byte{}); err != nil {
 				return
 			}

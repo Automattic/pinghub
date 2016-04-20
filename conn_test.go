@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"github.com/VividCortex/multitick"
 	"testing"
 	"time"
 )
@@ -63,7 +62,7 @@ func TestConnReadMessage(t *testing.T) {
 
 func TestConnWriter(t *testing.T) {
 	h := newHub()
-	h.ticker = multitick.NewTicker(2*time.Second, time.Millisecond*-1)
+	h.ticker = newMTicker(2 * time.Second)
 
 	conn := newTestConnection()
 	conn.w = mockWsInteractor{}
@@ -98,7 +97,7 @@ func TestConnWriter(t *testing.T) {
 func TestSharedTicker(t *testing.T) {
 	testTickerCount = 0
 	h := newHub()
-	h.ticker = multitick.NewTicker(2*time.Second, time.Millisecond*-1)
+	h.ticker = newMTicker(2 * time.Second)
 
 	// create multiple connections on the same path
 	for i := 0; i < 9; i++ {
