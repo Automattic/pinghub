@@ -1,10 +1,12 @@
 package main
 
 import (
+	"sync"
 	"time"
 )
 
 type mTicker struct {
+	mux         sync.Mutex
 	subscribers subscribers
 	ticker      *time.Ticker
 	stopCh      chan struct{}
@@ -46,7 +48,11 @@ func (t *mTicker) subscribe() *subscriber {
 	return sub
 }
 
+// closes subscriber channel and
+// removes from subscribers map
 func (t *mTicker) unsubscribe(subscriber *subscriber) {
+	t.mux.Lock()
+	defer t.mux.Unlock()
 	close(subscriber.tick)
 	delete(t.subscribers, subscriber)
 }
@@ -70,6 +76,7 @@ func (t *mTicker) tick() {
 	for {
 		select {
 		case tick := <-t.ticker.C:
+			t.mux.Lock()
 			for sub := range t.subscribers {
 				select {
 				case sub.tick <- tick:
@@ -77,6 +84,7 @@ func (t *mTicker) tick() {
 					t.dropped++
 				}
 			}
+			t.mux.Unlock()
 		case <-t.stopCh:
 			return
 		}
