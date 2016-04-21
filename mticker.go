@@ -8,12 +8,9 @@ import (
 type mTicker struct {
 	mux         sync.Mutex // Protects chans slice
 	subscribers subscribers
-
-	tickerMux sync.Mutex // Used to sync start/stop
-	ticker    *time.Ticker
-	stopCh    chan struct{}
-	stopped   bool
-	dropped   int
+	ticker      *time.Ticker
+	stopCh      chan struct{}
+	dropped     int
 }
 
 type subscribers map[*subscriber]interface {
@@ -23,28 +20,16 @@ type subscriber struct {
 	tick chan time.Time
 }
 
-// creates and starts a new ticker
-// that can have subscribed channels to receive
-// ticks
+// creates and starts a new ticker that can
+// have subscribed channels to receive ticks
 func newMTicker(interval time.Duration) *mTicker {
 	t := &mTicker{
 		subscribers: make(subscribers),
+		stopCh:      make(chan struct{}, 1),
+		ticker:      time.NewTicker(interval),
 	}
 
-	go func() {
-		t.tickerMux.Lock()
-		stopped := t.stopped
-
-		if !stopped {
-			t.stopCh = make(chan struct{}, 1)
-			t.ticker = time.NewTicker(interval)
-		}
-		t.tickerMux.Unlock()
-
-		if !stopped {
-			t.tick()
-		}
-	}()
+	go t.tick()
 	return t
 }
 
@@ -77,20 +62,18 @@ func (t *mTicker) unsubscribe(subscriber *subscriber) {
 // Stop stops the ticker, and closes
 // all subscribed channels
 func (t *mTicker) stop() {
-	t.tickerMux.Lock()
-	defer t.tickerMux.Unlock()
-
-	if !t.stopped && t.stopCh != nil {
+	if t.stopCh != nil {
+		t.ticker.Stop()
+		t.stopCh <- struct{}{}
 		// close all subscribed time chans
 		for sub := range t.subscribers {
 			close(sub.tick)
 		}
-		t.ticker.Stop()
-		t.stopCh <- struct{}{}
 	}
-	t.stopped = true
 }
 
+// broadcast ticks to all
+// subscribed channels
 func (t *mTicker) tick() {
 	for {
 		select {
