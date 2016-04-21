@@ -23,7 +23,7 @@ func TestUnsubscribe(t *testing.T) {
 	ticker := newMTicker(2 * time.Second)
 	sub := ticker.subscribe()
 
-	// assert 2 subscribers
+	// assert 1 subscribers
 	if len(ticker.subscribers) != 1 {
 		t.Fatal("Expectation: 1, Received:", len(ticker.subscribers))
 	}
