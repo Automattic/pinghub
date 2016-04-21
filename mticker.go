@@ -65,7 +65,7 @@ func (t *mTicker) stop() {
 		t.stopCh <- struct{}{}
 		// close all subscribed time chans
 		for sub := range t.subscribers {
-			close(sub.tick)
+			t.unsubscribe(sub)
 		}
 	}
 }

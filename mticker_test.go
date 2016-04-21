@@ -71,12 +71,15 @@ func TestStop(t *testing.T) {
 
 	// assert all subscribing
 	// channels closed
-	// assert chan closed
 	_, ok1 := <-sub1.tick
 	_, ok2 := <-sub2.tick
 
 	if ok1 || ok2 {
 		t.Fatal("Expectation: all tick channels should be closed, Received: open channel")
+	}
+
+	if len(ticker.subscribers) != 0 {
+		t.Fatal("Expectation: 0 subscribers, Received:", len(ticker.subscribers))
 	}
 
 }
