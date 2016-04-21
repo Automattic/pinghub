@@ -1,12 +1,10 @@
 package main
 
 import (
-	"sync"
 	"time"
 )
 
 type mTicker struct {
-	mux         sync.Mutex // Protects chans slice
 	subscribers subscribers
 	ticker      *time.Ticker
 	stopCh      chan struct{}
@@ -43,18 +41,12 @@ func newSubscriber() *subscriber {
 // can't be delivered to the channel, because it is not ready to receive, are
 // discarded.
 func (t *mTicker) subscribe() *subscriber {
-	t.mux.Lock()
-	defer t.mux.Unlock()
-
 	sub := newSubscriber()
 	t.subscribers[sub] = nil
 	return sub
 }
 
 func (t *mTicker) unsubscribe(subscriber *subscriber) {
-	t.mux.Lock()
-	defer t.mux.Unlock()
-
 	close(subscriber.tick)
 	delete(t.subscribers, subscriber)
 }
@@ -78,7 +70,6 @@ func (t *mTicker) tick() {
 	for {
 		select {
 		case tick := <-t.ticker.C:
-			t.mux.Lock()
 			for sub := range t.subscribers {
 				select {
 				case sub.tick <- tick:
@@ -86,7 +77,6 @@ func (t *mTicker) tick() {
 					t.dropped++
 				}
 			}
-			t.mux.Unlock()
 		case <-t.stopCh:
 			return
 		}
