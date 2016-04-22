@@ -43,6 +43,8 @@ func newSubscriber() *subscriber {
 // can't be delivered to the channel, because it is not ready to receive, are
 // discarded.
 func (t *mTicker) subscribe() *subscriber {
+	t.mux.Lock()
+	defer t.mux.Unlock()
 	sub := newSubscriber()
 	t.subscribers[sub] = nil
 	return sub
