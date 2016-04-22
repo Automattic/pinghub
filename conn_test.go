@@ -8,6 +8,7 @@ import (
 
 var testWrite []byte
 var testInt int
+var testTickerCount int
 
 func TestConnReadMessage(t *testing.T) {
 	conn := newTestConnection()
@@ -60,10 +61,14 @@ func TestConnReadMessage(t *testing.T) {
 }
 
 func TestConnWriter(t *testing.T) {
+	h := newHub()
+	h.ticker = newMTicker(2 * time.Second)
+
 	conn := newTestConnection()
 	conn.w = mockWsInteractor{}
+	conn.h = h
 
-	go conn.writer(2 * time.Second)
+	go conn.writer()
 	conn.send <- []byte("bananas")
 
 	// On receipt of valid message, message written
@@ -89,6 +94,36 @@ func TestConnWriter(t *testing.T) {
 
 }
 
+func TestSharedTicker(t *testing.T) {
+	testTickerCount = 0
+	h := newHub()
+	h.ticker = newMTicker(2 * time.Second)
+
+	// create multiple connections on the same path
+	for i := 0; i < 9; i++ {
+		conn := newTestConnection()
+		conn.path = "/monkey"
+		conn.h = h
+		conn.w = mockWsInteractor{}
+		go conn.writer()
+	}
+
+	// add connection on new path for control
+	conn2 := newTestConnection()
+	conn2.path = "/banana"
+	conn2.h = h
+	conn2.w = mockWsInteractor{}
+	go conn2.writer()
+
+	time.Sleep(3 * time.Second)
+
+	// Assert connections on the same path are not blocked
+	// by shared ticker
+	if testTickerCount < 10 {
+		t.Fatal("Expected: Ticker Count >= 10, Received:", testTickerCount)
+	}
+}
+
 func newTestConnection() *connection {
 	return &connection{
 		control: make(chan *channel, 1),
@@ -110,7 +145,9 @@ func (mq mockWsInteractor) wsSetPongHandler() {}
 
 func (mq mockWsInteractor) wsClose() {}
 
-func (mq mockWsInteractor) wsSetWriteDeadline() {}
+func (mq mockWsInteractor) wsSetWriteDeadline() {
+	testTickerCount = testTickerCount + 1
+}
 
 func (mq mockWsInteractor) wsReadMessage() (messageType int, p []byte, err error) {
 	return messageType, mq.msg, mq.err

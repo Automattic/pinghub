@@ -7,6 +7,7 @@ import (
 type hub struct {
 	queue    queue
 	channels channels
+	ticker   *mTicker
 }
 
 type channels map[string]*channel
@@ -15,6 +16,7 @@ func newHub() *hub {
 	return &hub{
 		queue:    make(queue, 16),
 		channels: make(channels),
+		ticker:   newMTicker(pingPeriod),
 	}
 }
 
@@ -28,6 +30,8 @@ func newChannel(h *hub, path string) *channel {
 }
 
 func (h *hub) run() {
+	defer h.ticker.stop()
+
 	for cmd := range h.queue {
 		// Forward cmds to their path's channel queues.
 		switch cmd.cmd {
