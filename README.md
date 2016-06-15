@@ -55,6 +55,8 @@ server {
   # ... (listen, ssl, etc.)
 
   location ^~ /pinghub {
+    # enforce strict upstream hashing
+    proxy_next_upstream off;
     # expect pinghub to respond quickly
     proxy_send_timeout 5s;
     # disconnect idle clients (keepalive enforcement)
