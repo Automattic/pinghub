@@ -63,6 +63,12 @@
 			"revisionTime": "2016-08-16T14:28:56Z"
 		},
 		{
+			"checksumSHA1": "ENXMCQg4FrojUU015gLI2qzhGIU=",
+			"path": "gopkg.in/dancannon/gorethink.v2",
+			"revision": "e75f34b0817d1ed1a4b967975ccf5fac9535dbc2",
+			"revisionTime": "2016-08-17T20:57:57Z"
+		},
+		{
 			"checksumSHA1": "N5RTTLfsBGd3eIIP8xVWQJYu3XU=",
 			"path": "gopkg.in/dancannon/gorethink.v2/encoding",
 			"revision": "e75f34b0817d1ed1a4b967975ccf5fac9535dbc2",
