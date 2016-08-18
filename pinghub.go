@@ -34,7 +34,8 @@ const (
 	SUBSCRIBE   = 1
 	UNSUBSCRIBE = 2
 	PUBLISH     = 3
-	REMOVE      = 4
+	BROADCAST   = 4
+	REMOVE      = 5
 )
 
 type queue chan command
