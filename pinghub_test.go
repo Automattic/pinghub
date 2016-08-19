@@ -100,43 +100,60 @@ func TestBadOrigin2(t *testing.T) {
 }
 
 func TestClients1(t *testing.T) {
-	testClientsN(t, 1, "/testpath1")
-	testClientsN(t, 1, randomPath())
+	testClientsN(t, 1, "/testpath1", 1)
+	testClientsN(t, 1, randomPath(), 1)
 }
 
 func TestClients10(t *testing.T) {
-	testClientsN(t, 10, "/testpath10")
-	testClientsN(t, 10, randomPath())
+	testClientsN(t, 10, "/testpath10", 2)
+	testClientsN(t, 10, randomPath(), 2)
 }
 
 func TestClients100(t *testing.T) {
-	testClientsN(t, 100, "/testpath100")
-	testClientsN(t, 100, randomPath())
+	testClientsN(t, 100, "/testpath100", 37)
+	testClientsN(t, 100, randomPath(), 37)
 }
 
 /*
 func TestClients1000(t *testing.T) {
-	testClientsN(t, 1000, "/testpath1000")
-	testClientsN(t, 1000, randomPath())
+	testClientsN(t, 1000, "/testpath1000", 241)
+	testClientsN(t, 1000, randomPath(), 241)
 }
 */
 
 func randomPath() string {
-	return "/" + quickValue("", rnd).(string)
+	u, _ := url.Parse(server.URL)
+	u.Path = "/" + quickValue("", rnd).(string)
+	for {
+		if len(u.EscapedPath()) < 120 {
+			break
+		}
+		// shorten EscapedPath by removing a rune
+		u.Path = string([]rune(u.Path)[1:])
+	}
+	return u.Path
 }
 
-func testClientsN(t *testing.T, numClients int, path string) {
+func testClientsN(t *testing.T, numClients int, path string, numPaths int) {
 	t.Log("Testing", numClients, "clients on path", path)
 	hub := mockHub()
 	clients := []*client{}
+	method := WS
+	lastWS := map[string]int{}
 	for i := 0; i < numClients; i++ {
-		method := quickValue(true, rnd).(bool)
-		message := quickValue("", rnd).(string)
+		if i > numPaths {
+			method = quickValue(method, rnd).(bool)
+		}
+		if i == numClients - 1 {
+			method = WS
+		}
+		message := fmt.Sprintf("%v_%v", i, quickValue("", rnd).(string))
 		newClient := mockClient(method, TESTORIGIN)
+		newClient.path = fmt.Sprintf("%v_%v", path, i % numPaths)
 		clients = append(clients, newClient)
 		c := clients[i]
 		u, _ := url.Parse(server.URL)
-		u.Path = path
+		u.Path = c.path
 		switch c.method {
 
 		case WS:
@@ -147,30 +164,39 @@ func testClientsN(t *testing.T, numClients int, path string) {
 			}
 			c.ws = ws
 			defer c.ws.Close()
-			hub.subscribe(path, c)
+			hub.subscribe(c.path, c)
 			go c.reader()
-			c.sendSync(t, message)
-			hub.send(path, message)
+			if i % 5 == 0 {
+				c.sendSync(t, message)
+				hub.send(c.path, message)
+			}
+			lastWS[c.path] = i
 
 		case POST:
+			// Wait until the last WS client receives
+			clients[lastWS[c.path]].waiting = true
 			resp := post(t, u, message)
 			if resp.Status != "200 OK" || string(responseBody(t, resp)) != "OK\n" {
 				t.Fatal("POST response not 200 OK:", resp)
 			}
-			hub.send(path, message)
+			hub.send(c.path, message)
+			<-clients[lastWS[c.path]].res
+			clients[lastWS[c.path]].waiting = false
 		}
 	}
 
-	t.Log("TestClients: clients receive messages in order")
 	// Give the server some time to transact with all clients.
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(time.Second)
+
+	t.Log("TestClients: clients receive messages in order")
 	for i := range clients {
 		c := clients[i]
 		if c.method == WS {
-			expected := strings.Join(hub.receiveAll(path, c), "")
-			got := strings.Join(c.readAll(), "")
-			if expected != got {
-				t.Fatal("expected", expected, "got", got)
+			expected := strings.Join(hub.receiveAll(c), "  ")
+			got := strings.Join(c.readAll(), "  ")
+			c.ws.Close()
+			if ! strings.HasSuffix(got, expected) {
+				t.Fatal("client", i, "path", c.path, "expected", expected, "got", got)
 			}
 		}
 	}
@@ -214,10 +240,10 @@ func (h *fakeHub) send(path string, message string) {
 	}
 }
 
-func (h *fakeHub) receiveAll(path string, client *client) (messages []string) {
+func (h *fakeHub) receiveAll(client *client) (messages []string) {
 	for {
 		select {
-		case m := <-h.m[path][client]:
+		case m := <-h.m[client.path][client]:
 			messages = append(messages, m)
 		default:
 			return
@@ -255,9 +281,10 @@ type client struct {
 	method  bool
 	waiting bool
 	ws      *websocket.Conn
-	res     chan struct{}
+	res     chan string
 	rec     []string
 	origin  string
+	path    string
 }
 
 func mockClient(method bool, origin string) *client {
@@ -266,7 +293,7 @@ func mockClient(method bool, origin string) *client {
 	}
 	return &client{
 		method: method,
-		res:    make(chan struct{}),
+		res:    make(chan string),
 		rec:    []string{},
 		origin: origin,
 	}
@@ -282,7 +309,7 @@ func (c *client) reader() {
 		c.rec = append(c.rec, string(message))
 		c.Unlock()
 		if c.waiting {
-			c.res <- struct{}{}
+			c.res <- string(message)
 		}
 	}
 }
@@ -299,14 +326,20 @@ func (c *client) sendSync(t *testing.T, message string) {
 	}
 	if message != "" {
 		ok := false
-		select {
-		case _, ok = <-c.res:
-			c.waiting = false
-		case <-time.After(time.Second * 1):
-			ok = false
-		}
-		if !ok {
-			t.Fatal("Failed waiting for echo.")
+		var m string
+		resloop: for {
+			select {
+			case m, ok = <-c.res:
+				if m == message {
+					c.waiting = false
+					break resloop
+				}
+			case <-time.After(time.Second * 2):
+				ok = false
+			}
+			if !ok {
+				t.Fatal("Failed waiting for echo.")
+			}
 		}
 	}
 }
