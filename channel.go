@@ -23,7 +23,7 @@ func (c *channel) run() {
 	var err error
 	c.session, err = r.Connect(r.ConnectOpts{
 		Address: "localhost:28015",
-		Database: "test",
+		Database: "pinghub",
 	})
 	if err != nil {
 		log.Fatalln(err.Error())
