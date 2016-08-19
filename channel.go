@@ -93,7 +93,7 @@ func (c *channel) publish(text []byte) {
 	if len(text) == 0 {
 		return
 	}
-	resp, err := r.Table("pinghub").Insert(map[string]interface{}{
+	_, err := r.Table("pinghub").Insert(map[string]interface{}{
 		"id": string(c.path),
 		"text": string(text),
 		"time": time.Now().UnixNano(),
