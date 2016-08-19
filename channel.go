@@ -29,7 +29,6 @@ func (c *channel) run() {
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
-//	c.session = session
 	defer c.session.Close()
 
 	// Subscribe to the changefeed for this channel's path
@@ -46,7 +45,6 @@ func (c *channel) run() {
 			if !cursor.Next(&text) {
 				break
 			}
-			fmt.Println(text)
 			if text != "" {
 				c.queue<- command{cmd: BROADCAST, text: []byte(text)}
 			}
