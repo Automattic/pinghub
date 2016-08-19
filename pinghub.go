@@ -27,7 +27,7 @@ package main
 
 const (
 	pathLenMin = 1
-	pathLenMax = 256
+	pathLenMax = 127
 )
 
 const (
