@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -49,7 +48,6 @@ func (c *channel) run() {
 				c.queue<- command{cmd: BROADCAST, text: []byte(text)}
 			}
 		}
-		fmt.Println("cursor.Next loop ended")
 	}()
 
 	incr("channels", 1)
@@ -102,10 +100,8 @@ func (c *channel) publish(text []byte) {
 		Conflict: "replace",
 	}).RunWrite(c.session)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
-	fmt.Println(resp)
 }
 
 func (c *channel) broadcast(text []byte) {
