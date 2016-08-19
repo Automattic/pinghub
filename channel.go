@@ -37,11 +37,12 @@ func (c *channel) run() {
 	}
 	defer cursor.Close()
 
-	// Publish 
+	// Pipe changefeed messages into the channel's queue
 	go func() {
 		var text string
 		for {
 			if !cursor.Next(&text) {
+				// cursor was closed
 				break
 			}
 			if text != "" {
