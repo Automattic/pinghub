@@ -31,11 +31,11 @@ const (
 )
 
 const (
-	SUBSCRIBE   = 1
-	UNSUBSCRIBE = 2
-	PUBLISH     = 3
-	BROADCAST   = 4
-	REMOVE      = 5
+	SUBSCRIBE   = 1 // client connected
+	UNSUBSCRIBE = 2 // client disconnected
+	PUBLISH     = 3 // message received
+	BROADCAST   = 4 // message outbound
+	REMOVE      = 5 // channel has no clients
 )
 
 type queue chan command
