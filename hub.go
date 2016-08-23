@@ -2,12 +2,17 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"time"
+
+	r "gopkg.in/dancannon/gorethink.v2"
 )
 
 type hub struct {
 	queue    queue
 	channels channels
 	ticker   *mTicker
+	session     *r.Session
 }
 
 type channels map[string]*channel
@@ -31,6 +36,17 @@ func newChannel(h *hub, path string) *channel {
 
 func (h *hub) run() {
 	defer h.ticker.stop()
+
+	// Open a connection to rethinkdb
+	var err error
+	h.session, err = r.Connect(r.ConnectOpts{
+		Address: "localhost:28015",
+		Database: "pinghub",
+	})
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	defer h.session.Close()
 
 	for cmd := range h.queue {
 		// Forward cmds to their path's channel queues.
@@ -67,7 +83,16 @@ func (h *hub) publish(cmd command) {
 			h.remove(cmd)
 		}
 	} else {
-		mark("drops", 1)
+		_, err := r.Table("pinghub").Insert(map[string]interface{}{
+			"id": string(cmd.path),
+			"text": string(cmd.text),
+			"time": time.Now().UnixNano(),
+		}, r.InsertOpts{
+			Conflict: "replace",
+		}).RunWrite(h.session)
+		if err != nil {
+			log.Println("Failed to publish post")
+		}
 	}
 }
 
