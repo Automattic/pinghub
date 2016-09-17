@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestHubSubscribe(t *testing.T) {
@@ -52,20 +53,28 @@ func TestHubSubscribe(t *testing.T) {
 
 func TestHubPublish(t *testing.T) {
 	h := newHub()
+	go h.run()
 	// Publishing to a non-existant channel
 	// should drop message
-	h.publish(command{cmd: PUBLISH, path: "/monkey", text: []byte("banana 1"), conn: newTestConnection()})
+	h.queue<- command{cmd: PUBLISH, path: "/monkey", text: []byte("banana 1"), conn: newTestConnection()}
+	time.Sleep(100 * time.Millisecond)
 	if _, ok := h.channels["/monkey"]; ok {
 		t.Fatal("Expectation: Channel should not exist without a Subscriber")
 	}
 
-	// Publishing to a open channel
+	// Publishing to a subscribed channel
 	// Command should be pushed onto channel queue
-	h.subscribe(command{cmd: SUBSCRIBE, path: "/monkey", conn: newTestConnection()})
-	h.publish(command{cmd: PUBLISH, path: "/monkey", text: []byte("banana 2"), conn: newTestConnection()})
-	_, cmd := <-h.channels["/monkey"].queue, <-h.channels["/monkey"].queue
-	if string(cmd.text) != "banana 2" {
-		t.Fatal("Expectation: banana 2, Received:", string(cmd.text))
+	conn := newTestConnection()
+	h.queue<- command{cmd: SUBSCRIBE, path: "/monkey", conn: conn}
+	time.Sleep(100 * time.Millisecond)
+	if _, ok := h.channels["/monkey"]; !ok {
+		t.Fatal("Expectation: Channel should exist")
+	}
+	h.queue<- command{cmd: PUBLISH, path: "/monkey", text: []byte("banana 2"), conn: newTestConnection()}
+	time.Sleep(100 * time.Millisecond)
+	text := <-conn.send
+	if string(text) != "banana 2" {
+		t.Fatal("Expectation: banana 2, Received:", string(text))
 	}
 }
 
