@@ -12,7 +12,7 @@ type hub struct {
 	queue    queue
 	channels channels
 	ticker   *mTicker
-	session     *r.Session
+	session  *r.Session
 }
 
 type record struct {
@@ -44,7 +44,7 @@ func (h *hub) run() {
 	// Open a connection to rethinkdb
 	var err error
 	h.session, err = r.Connect(r.ConnectOpts{
-		Address: "localhost:28015",
+		Address:  "localhost:28015",
 		Database: "pinghub",
 	})
 	if err != nil {
@@ -65,7 +65,7 @@ func (h *hub) run() {
 		for cursor.Next(&rec) {
 			if rec.Id != "" && rec.Text != "" {
 				if channel, ok := h.channels[rec.Id]; ok {
-					channel.queue<- command{cmd: BROADCAST, text: []byte(rec.Text)}
+					channel.queue <- command{cmd: BROADCAST, text: []byte(rec.Text)}
 				}
 			}
 		}
@@ -99,7 +99,7 @@ func (h *hub) subscribe(cmd command) {
 
 func (h *hub) publish(cmd command) {
 	_, err := r.Table("pinghub").Insert(map[string]interface{}{
-		"id": string(cmd.path),
+		"id":   string(cmd.path),
 		"text": string(cmd.text),
 		"time": time.Now().UnixNano(),
 	}, r.InsertOpts{

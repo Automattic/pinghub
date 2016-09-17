@@ -32,7 +32,7 @@ func TestChannelPublish(t *testing.T) {
 
 	// Subscribe and Publish text to Channel
 	c.h.queue <- command{cmd: SUBSCRIBE, conn: conn, path: c.path}
-	c.queue<- command{cmd: PUBLISH, text: []byte("monkey")}
+	c.queue <- command{cmd: PUBLISH, text: []byte("monkey")}
 	text := <-conn.send
 	if string(text) != "monkey" {
 		t.Fatal("Expectation: published text should be 'monkey', Received:", string(text))
@@ -41,16 +41,16 @@ func TestChannelPublish(t *testing.T) {
 	// Publish should occur on all of the channel's connections, unless message empty
 	conn2 := newTestConnection()
 	c.h.queue <- command{cmd: SUBSCRIBE, conn: conn2, path: c.path}
-	c.queue<- command{cmd: PUBLISH, text: []byte("")}
-	c.queue<- command{cmd: PUBLISH, text: []byte("banana")}
+	c.queue <- command{cmd: PUBLISH, text: []byte("")}
+	c.queue <- command{cmd: PUBLISH, text: []byte("banana")}
 
 	text1, text2 := <-conn.send, <-conn2.send
 	if string(text1) != "banana" || string(text2) != "banana" {
 		t.Fatal("Expectation: published text for connections should be 'banana', Received:", string(text1), string(text1))
 	}
 
-	c.queue<- command{cmd: UNSUBSCRIBE, conn: conn}
-	c.queue<- command{cmd: UNSUBSCRIBE, conn: conn2}
+	c.queue <- command{cmd: UNSUBSCRIBE, conn: conn}
+	c.queue <- command{cmd: UNSUBSCRIBE, conn: conn2}
 }
 
 func TestChannelUnsubscribe(t *testing.T) {

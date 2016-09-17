@@ -14,7 +14,7 @@ type metrics struct {
 var m = &metrics{reg: gometrics.DefaultRegistry}
 
 func startMetrics(port string) {
-	ln, err := net.Listen("tcp", "127.0.0.1:" + port)
+	ln, err := net.Listen("tcp", "127.0.0.1:"+port)
 	if err != nil {
 		panic(err)
 	}

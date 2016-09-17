@@ -144,12 +144,12 @@ func testClientsN(t *testing.T, numClients int, path string, numPaths int) {
 		if i > numPaths {
 			method = quickValue(method, rnd).(bool)
 		}
-		if i == numClients - 1 {
+		if i == numClients-1 {
 			method = WS
 		}
 		message := fmt.Sprintf("%v_%v", i, quickValue("", rnd).(string))
 		newClient := mockClient(method, TESTORIGIN)
-		newClient.path = fmt.Sprintf("%v_%v", path, i % numPaths)
+		newClient.path = fmt.Sprintf("%v_%v", path, i%numPaths)
 		clients = append(clients, newClient)
 		c := clients[i]
 		u, _ := url.Parse(server.URL)
@@ -166,7 +166,7 @@ func testClientsN(t *testing.T, numClients int, path string, numPaths int) {
 			defer c.ws.Close()
 			hub.subscribe(c.path, c)
 			go c.reader()
-			if i % 5 == 0 {
+			if i%5 == 0 {
 				c.sendSync(t, message)
 				hub.send(c.path, message)
 			}
@@ -195,7 +195,7 @@ func testClientsN(t *testing.T, numClients int, path string, numPaths int) {
 			expected := strings.Join(hub.receiveAll(c), "  ")
 			got := strings.Join(c.readAll(), "  ")
 			c.ws.Close()
-			if ! strings.HasSuffix(got, expected) {
+			if !strings.HasSuffix(got, expected) {
 				t.Fatal("client", i, "path", c.path, "expected", expected, "got", got)
 			}
 		}
@@ -327,7 +327,8 @@ func (c *client) sendSync(t *testing.T, message string) {
 	if message != "" {
 		ok := false
 		var m string
-		resloop: for {
+	resloop:
+		for {
 			select {
 			case m, ok = <-c.res:
 				if m == message {

@@ -22,17 +22,17 @@ func main() {
 	flag.StringVar(&metricsPort, "mport", metricsPort, "metrics service port")
 	flag.StringVar(&server.Addr, "addr", server.Addr, "http service address (TCP address or absolute path for UNIX socket)")
 	origin := flag.String("origin", "", "websocket server checks Origin headers against this scheme://host[:port]")
-	logpath := flag.String("log", "", "Log file (absolute path)");
+	logpath := flag.String("log", "", "Log file (absolute path)")
 
 	flag.Parse()
 
 	if strings.HasPrefix(*logpath, "/") {
-		logf, err := os.OpenFile(*logpath, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+		logf, err := os.OpenFile(*logpath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
 			log.Fatalf("error opening log file: %v", err)
 		}
-		defer func(){
-			log.Printf( "********** pid %d stopping **********", os.Getpid())
+		defer func() {
+			log.Printf("********** pid %d stopping **********", os.Getpid())
 			logf.Close()
 		}()
 		if err = syscall.Dup2(int(logf.Fd()), syscall.Stdout); err != nil {
@@ -42,7 +42,7 @@ func main() {
 			log.Fatalf("error redirecting stderr to file: %v", err)
 		}
 		log.SetFlags(log.Ldate | log.Lmicroseconds | log.LUTC)
-		log.Printf( "********** pid %d starting **********", os.Getpid())
+		log.Printf("********** pid %d starting **********", os.Getpid())
 	}
 
 	// Initialize metrics registry with expected stats
