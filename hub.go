@@ -15,6 +15,10 @@ type hub struct {
 	session     *r.Session
 }
 
+type record struct {
+	Id, Text string
+}
+
 type channels map[string]*channel
 
 func newHub() *hub {
@@ -48,6 +52,25 @@ func (h *hub) run() {
 	}
 	defer h.session.Close()
 
+	// Subscribe to the changefeed
+	cursor, err := r.Table("pinghub").Changes().Field("new_val").Run(h.session)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer cursor.Close()
+
+	// Pipe changefeed messages into channel queues
+	go func() {
+		var rec record
+		for cursor.Next(&rec) {
+			if rec.Id != "" && rec.Text != "" {
+				if channel, ok := h.channels[rec.Id]; ok {
+					channel.queue<- command{cmd: BROADCAST, text: []byte(rec.Text)}
+				}
+			}
+		}
+	}()
+
 	for cmd := range h.queue {
 		// Forward cmds to their path's channel queues.
 		switch cmd.cmd {
@@ -75,24 +98,15 @@ func (h *hub) subscribe(cmd command) {
 }
 
 func (h *hub) publish(cmd command) {
-	if channel, ok := h.channels[cmd.path]; ok {
-		select {
-		case channel.queue <- cmd:
-		default:
-			// Tried publishing to a closing channel.
-			h.remove(cmd)
-		}
-	} else {
-		_, err := r.Table("pinghub").Insert(map[string]interface{}{
-			"id": string(cmd.path),
-			"text": string(cmd.text),
-			"time": time.Now().UnixNano(),
-		}, r.InsertOpts{
-			Conflict: "replace",
-		}).RunWrite(h.session)
-		if err != nil {
-			log.Println("Failed to publish post")
-		}
+	_, err := r.Table("pinghub").Insert(map[string]interface{}{
+		"id": string(cmd.path),
+		"text": string(cmd.text),
+		"time": time.Now().UnixNano(),
+	}, r.InsertOpts{
+		Conflict: "replace",
+	}).RunWrite(h.session)
+	if err != nil {
+		log.Println("Failed to publish post")
 	}
 }
 
