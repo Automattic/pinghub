@@ -149,8 +149,8 @@ func testClientsN(t *testing.T, numClients int, path string) {
 			defer c.ws.Close()
 			hub.subscribe(path, c)
 			go c.reader()
-			c.sendSync(t, message)
-			hub.send(path, message)
+			//c.sendSync(t, message)
+			//hub.send(path, message)
 
 		case POST:
 			resp := post(t, u, message)
