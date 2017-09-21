@@ -66,7 +66,9 @@ func (c *connection) reader() {
 			c.send <- []byte{}
 			continue
 		}
-		c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
+		// Ignore messages from websocket clients until configuration can enable this per path/pattern.
+		// We don't want to open an amplification attack surface with the introduction of global, public channels.
+		//c.channel.queue <- command{cmd: PUBLISH, path: c.path, text: message}
 		mark("websocketmsgs", 1)
 	}
 	c.ws.Close()
