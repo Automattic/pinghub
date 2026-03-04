@@ -16,7 +16,7 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer.
-	maxMessageSize = 512
+	maxMessageSize = 64 * 1024 // 64KB (65536 bytes)
 )
 
 type websocketManager interface {
